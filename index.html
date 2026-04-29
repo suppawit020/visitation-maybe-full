@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Visitation</title>
+        <link rel="manifest" href="manifest.json">
+        <meta name="theme-color" content="#7C9082">
+        <link rel="apple-touch-icon" href="icon.png">
+        <link rel="stylesheet" href="style.css">
+        <style>
+        /* Tom Select — match app theme */
+        .ts-wrapper { width: 100%; }
+        .ts-wrapper .ts-control {
+            padding: 10px 14px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 14px;
+            box-shadow: none;
+            min-height: unset;
+            gap: 4px;
+        }
+        .ts-wrapper.focus .ts-control { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,144,130,0.15); }
+        .ts-dropdown {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .ts-dropdown .option { padding: 10px 14px; }
+        .ts-dropdown .option:hover, .ts-dropdown .option.active { background: rgba(124,144,130,0.15); color: var(--text-main); }
+        .ts-dropdown .option.selected { background: rgba(124,144,130,0.25); }
+        .ts-wrapper .ts-control input { color: var(--text-main); font-family: inherit; font-size: 14px; }
+        .ts-wrapper .ts-control input::placeholder { color: var(--text-muted); }
+        .ts-dropdown-content { max-height: 220px; }
+        .ts-wrapper .clear-button { color: var(--text-muted); }
+    </style>
+        <link rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <link rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.min.css">
+        <script
+            src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    </head>
+
+    <body>
+
+        <div id="login-screen"
+            style="display:flex; position:relative; align-items:center; justify-content:center; min-height:100vh; padding:2rem; background:var(--bg-color);">
+            <button id="theme-toggle-login" class="btn-icon"
+                onclick="toggleDarkMode()" title="Toggle Dark Mode"
+                style="position: absolute; top: 24px; right: 24px; background: var(--card-bg); border: 1px solid var(--border-light); color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; box-shadow: var(--shadow-sm); z-index: 10;">
+                <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"
+                    style="display: none;"><circle cx="12" cy="12"
+                        r="5"></circle><line x1="12" y1="1" x2="12"
+                        y2="3"></line><line x1="12" y1="21" x2="12"
+                        y2="23"></line><line x1="4.22" y1="4.22" x2="5.64"
+                        y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78"
+                        y2="19.78"></line><line x1="1" y1="12" x2="3"
+                        y2="12"></line><line x1="21" y1="12" x2="23"
+                        y2="12"></line><line x1="4.22" y1="19.78" x2="5.64"
+                        y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78"
+                        y2="4.22"></line></svg>
+                <svg class="moon-icon" width="20" height="20"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round"><path
+                        d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+            <div
+                style="width:100%; max-width:400px; background:var(--card-bg); border-radius:20px; padding:2.5rem; box-shadow:var(--shadow-md); border:1px solid var(--border-light);">
+                <div style="text-align:center; margin-bottom:2rem;">
+                    <div
+                        style="width:56px; height:56px; background:rgba(124, 144, 130, 0.1); border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">
+                        <svg width="28" height="28" viewBox="0 0 24 24"
+                            fill="none" stroke="var(--primary)" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"><path
+                                d="M9 11l3 3L22 4" /><path
+                                d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+                    </div>
+                    <h2
+                        style="font-size:20px; font-weight:600; color:var(--text-main); margin-bottom:4px;">Visitation</h2>
+                    <p style="font-size:13px; color:var(--text-muted);">Sign in
+                        to continue</p>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    <div>
+                        <label
+                            style="font-size:13px; font-weight:500; color:var(--text-muted); display:block; margin-bottom:6px;">Username</label>
+                        <input type="text" id="login-username"
+                            placeholder="Username"
+                            style="width:100%; padding:10px 14px; font-size:14px; border-radius:8px; outline:none; font-family:inherit; border:1px solid var(--border-light);"
+                            onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+                    </div>
+                    <div>
+                        <label
+                            style="font-size:13px; font-weight:500; color:var(--text-muted); display:block; margin-bottom:6px;">Password</label>
+                        <div
+                            style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="login-pass"
+                                placeholder="••••••••"
+                                style="width:100%; padding:10px 40px 10px 14px; font-size:14px; border-radius:8px; outline:none; font-family:inherit; border:1px solid var(--border-light);"
+                                onkeydown="if(event.key==='Enter')doUserLogin()">
+                            <button type="button"
+                                onclick="togglePasswordVisibility()"
+                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; padding: 4px;"
+                                title="Toggle Password">
+                                <svg id="eye-icon" width="18" height="18"
+                                    viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path
+                                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        style="display:flex; align-items:center; gap:8px; margin-top:2px;">
+                        <input type="checkbox" id="login-remember"
+                            style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
+                        <label for="login-remember"
+                            style="font-size:13px;color:var(--text-muted);cursor:pointer;">Remember
+                            me</label>
+                    </div>
+                    <div id="login-error"
+                        style="display:none; background:#FEF8F8; color:#D48A8A; padding:10px 14px; border-radius:8px; font-size:13px; border:1px solid #F0D0D0;"></div>
+                    <button onclick="doUserLogin()"
+                        style="margin-top:4px; padding:12px; background:var(--primary); color:#FFF; border:none; border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; font-family:inherit; transition:0.2s;"
+                        onmouseover="this.style.background='var(--primary-hover)'"
+                        onmouseout="this.style.background='var(--primary)'">Sign
+                        In</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="app" id="main-app" style="display:none;">
+            <div class="header" style="position: relative; z-index: 100;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <h1>Visitation</h1>
+                    <span class="rec-badge" id="rec-count">0 records</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button id="theme-toggle" class="btn-icon"
+                        onclick="toggleDarkMode()" title="Toggle Dark Mode"
+                        style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--card-bg); box-shadow: var(--shadow-sm);">
+                        <svg class="sun-icon" width="20" height="20"
+                            viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            style="display: none;"><circle cx="12" cy="12"
+                                r="5"></circle><line x1="12" y1="1" x2="12"
+                                y2="3"></line><line x1="12" y1="21" x2="12"
+                                y2="23"></line><line x1="4.22" y1="4.22"
+                                x2="5.64" y2="5.64"></line><line x1="18.36"
+                                y1="18.36" x2="19.78" y2="19.78"></line><line
+                                x1="1" y1="12" x2="3" y2="12"></line><line
+                                x1="21" y1="12" x2="23" y2="12"></line><line
+                                x1="4.22" y1="19.78" x2="5.64"
+                                y2="18.36"></line><line x1="18.36" y1="5.64"
+                                x2="19.78" y2="4.22"></line></svg>
+                        <svg class="moon-icon" width="20" height="20"
+                            viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"><path
+                                d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </button>
+                    <div class="profile-menu-container" id="profile-menu-wrap"
+                        style="display: none;">
+                        <div class="profile-trigger"
+                            onclick="toggleProfileMenu()">
+                            <div class="avatar" id="avatar-initial"
+                                style="position: relative; overflow: hidden;">
+                                <span id="avatar-small-text">U</span>
+                                <img id="avatar-small-img" src
+                                    style="display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;">
+                            </div>
+                        </div>
+
+                        <div class="profile-dropdown" id="profile-dropdown">
+                            <div class="pd-header">
+                                <div class="avatar large"
+                                    id="avatar-initial-large"
+                                    onclick="document.getElementById('profile-upload-input').click()"
+                                    style="cursor: pointer; position: relative; overflow: hidden;"
+                                    title="Change Profile Picture">
+                                    <span id="avatar-text">U</span>
+                                    <img id="avatar-img" src
+                                        style="display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;">
+                                    <div class="avatar-overlay">
+                                        <svg width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none"
+                                            stroke="white" stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"><path
+                                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle
+                                                cx="12" cy="13"
+                                                r="4"></circle></svg>
+                                    </div>
+                                </div>
+                                <input type="file" id="profile-upload-input"
+                                    accept="image/*" style="display: none;"
+                                    onchange="handleProfileUpload(this)">
+
+                                <div class="pd-info">
+                                    <div class="pd-name" id="pd-name"
+                                        style="font-weight: 700; color: var(--text-main);">Name</div>
+                                    <div id="pd-emp-id"
+                                        style="font-size: 11px; color: var(--primary); font-family: monospace; font-weight: 600;">EMP-000</div>
+                                </div>
+                            </div>
+                            <div class="pd-body"
+                                style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;">
+                                <div class="pd-row"
+                                    style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span class="pd-label"
+                                        style="font-size: 12px; color: var(--text-muted);">Team</span>
+                                    <span class="badge badge-area" id="pd-team"
+                                        style="background:var(--primary); color:white; border:none;">Team</span>
+                                </div>
+                                <div class="pd-row"
+                                    style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span class="pd-label"
+                                        style="font-size: 12px; color: var(--text-muted);">Area</span>
+                                    <span class="badge badge-pos"
+                                        id="pd-sub-team">-</span>
+                                </div>
+                                <div class="pd-row"
+                                    style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span class="pd-label"
+                                        style="font-size: 12px; color: var(--text-muted);">Email</span>
+                                    <span id="pd-email"
+                                        style="font-size: 13px; color: var(--text-main);">email@example.com</span>
+                                </div>
+                                <div class="pd-row"
+                                    style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span class="pd-label"
+                                        style="font-size: 12px; color: var(--text-muted);">Contact</span>
+                                    <span id="pd-contact"
+                                        style="font-size: 13px; color: var(--text-main);">-</span>
+                                </div>
+                            </div>
+                            <div class="pd-footer">
+                                <button class="btn-logout"
+                                    onclick="doUserLogout()">
+                                    <svg width="16" height="16"
+                                        viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        style="margin-right: 6px;"><path
+                                            d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline
+                                            points="16 17 21 12 16 7"></polyline><line
+                                            x1="21" y1="12" x2="9"
+                                            y2="12"></line></svg>
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('new')">New
+                    Visit</div>
+                <div class="tab" onclick="switchTab('list')">All Visits</div>
+            </div>
+
+            <div id="tab-new" style="display:none">
+                <div class="card">
+                    <div class="section-title">Visit Information</div>
+                    <div class="form-grid">
+                        <!-- 1. เติมคำว่า full เข้าไปในคลาส เพื่อให้กล่องนี้กินพื้นที่เต็มบรรทัด -->
+                        <div class="form-group full">
+                            <label>Customer / Outlet <span
+                                    class="req">*</span></label>
+                            <select id="f-customer">
+                                <option value>-- Select outlet --</option>
+                            </select>
+                            <input type="hidden" id="f-outlet-name">
+                        </div>
+
+                        <!-- Team & Sub-Team are auto-filled and locked from user profile -->
+                        <select id="f-main-team" style="display:none;"></select>
+                        <select id="f-sub-team" style="display:none;"></select>
+
+                        <!-- 2. สองกล่องนี้ไม่ต้องแก้โค้ด มันจะขยับมาอยู่คู่กัน (ซ้าย-ขวา) อัตโนมัติ -->
+                        <div class="form-group">
+                            <label>Person You Met <span
+                                    class="req">*</span></label>
+                            <input type="text" id="f-person"
+                                placeholder="Full name">
+                        </div>
+                        <div class="form-group">
+                            <label>Their Position <span
+                                    class="req">*</span></label>
+                            <select id="f-position">
+                                <option value>Select position</option>
+                                <option>CEO</option><option>CFO</option><option>OWNER</option>
+                                <option>BARTENDER</option><option>F&amp;B
+                                    MANAGER</option>
+                                <option>MANAGER</option><option
+                                    value="__other__">ETC — Please Type</option>
+                            </select>
+                        </div>
+
+                        <!-- ส่วนอื่นๆ ปล่อยไว้เหมือนเดิมครับ -->
+                        <div class="form-group full" id="pos-other-wrap"
+                            style="display:none">
+                            <label>Specify Position <span
+                                    class="req">*</span></label>
+                            <input type="text" id="f-pos-other"
+                                placeholder="Enter position">
+                        </div>
+                        <div class="form-group full">
+                            <label>Visit Date <span class="req">*</span></label>
+                            <input type="text" id="f-date"
+                                placeholder="Select Date">
+                        </div>
+                        <div class="form-group full">
+                            <label>Reason for Visit <span
+                                    class="req">*</span></label>
+                            <textarea id="f-reason" rows="2"
+                                placeholder="Purpose of this visit..."></textarea>
+                        </div>
+
+                        <div class="form-group full">
+                            <label>Result of Visit <span class="req"
+                                    id="result-req-star">*</span></label>
+                            <textarea id="f-result" rows="2"
+                                placeholder="Outcomes, agreements, follow-ups..."></textarea>
+                        </div>
+
+                        <div class="form-group full" style="margin-top: 8px;">
+                            <label>Follow-up Actions <span
+                                    style="color:var(--text-muted); font-weight:normal;">(Optional)</span></label>
+                            <div class="checkbox-grid">
+                                <label class="cb-label"><input type="checkbox"
+                                        class="f-followup"
+                                        value="Send Quotation / Documents"> Send
+                                    Quotation/Docs</label>
+                                <label class="cb-label"><input type="checkbox"
+                                        class="f-followup"
+                                        value="Call Back Later"> Call Back
+                                    Later</label>
+                                <label class="cb-label"><input type="checkbox"
+                                        id="cb-next-visit" class="f-followup"
+                                        value="Schedule Next Visit"> Schedule
+                                    Next Visit</label>
+                            </div>
+                            <div id="next-visit-wrap"
+                                style="display: none; margin-top: 10px; background: var(--bg-color); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light);">
+                                <label
+                                    style="font-size: 12px; color: var(--primary); display: block; margin-bottom: 6px;">Select
+                                    Date for Next Visit:</label>
+                                <input type="text" id="f-next-date"
+                                    placeholder="Select Date"
+                                    style="border-color: var(--primary); width: 100%;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-title"
+                        style="display: flex; justify-content: space-between;">
+                        <span>Live Evidence</span>
+                        <span id="photo-counter"
+                            style="color: var(--primary); font-weight: 600;">0 /
+                            10</span>
+                    </div>
+
+                    <div class="easy-camera-container">
+                        <div
+                            style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                            <button class="btn-open-camera" id="btn-start-cam"
+                                onclick="startCamera()" type="button"
+                                style="margin: 0; padding: 12px 20px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    style="margin-right: 8px;"><path
+                                        d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle
+                                        cx="12" cy="13" r="4"></circle></svg>
+                                CAMERA
+                            </button>
+                            <button class="btn-secondary"
+                                onclick="selectFromLibrary()" type="button"
+                                style="margin: 0; padding: 12px 20px; border-radius: 30px; display: flex; align-items: center; font-weight: 600; border: 2px solid var(--primary); color: var(--primary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    style="margin-right: 8px;"><rect x="3" y="3"
+                                        width="18" height="18" rx="2"
+                                        ry="2" /><circle cx="8.5" cy="8.5"
+                                        r="1.5" /><polyline
+                                        points="21 15 16 10 5 21" /></svg>
+                                LIBRARY
+                            </button>
+                        </div>
+                        <input type="file" id="library-input" accept="image/*"
+                            multiple style="display: none;"
+                            onchange="handleLibrarySelection(this)">
+                        <p
+                            style="font-size: 12px; color: var(--text-muted); margin-top: 12px;">Capture
+                            or select up to 10 photos</p>
+                        <div class="captured-section" id="captured-section"
+                            style="display: none;">
+                            <div class="captured-title">Captured Photos (Click
+                                to view)</div>
+                            <div class="photo-previews" id="previews"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn-secondary" id="btn-clear"
+                        onclick="clearForm()">Clear</button>
+                    <button class="btn-primary" id="btn-save"
+                        onclick="triggerSaveConfirm()">Save Visit</button>
+                </div>
+            </div>
+
+            <div id="tab-list" style="display:none">
+                <div class="filters"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;">
+                    <div style="width: 100%;">
+                        <select class="filter-select" id="fl-area"
+                            onchange="resetAndFetch()" style="width: 100%;">
+                            <option value>All areas</option>
+                            <option>BKK</option><option>NORTH</option><option>NORTHEAST</option><option>WEST</option><option>EAST</option><option>SOUTH</option>
+                            <option>Phuket-HRC</option><option>Phuket-OP</option><option>Samui-HRC</option><option>Samui-OP</option>
+                        </select>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <select class="filter-select" id="fl-pos"
+                            onchange="handleFilterPosChange()"
+                            style="width: 100%;">
+                            <option value>All positions</option>
+                            <option>CEO</option><option>CFO</option><option>OWNER</option><option>BARTENDER</option><option>F&amp;B
+                                MANAGER</option><option>MANAGER</option>
+                            <option value="__other__">ETC — Please Type</option>
+                        </select>
+                        <input class="filter-select" type="text"
+                            id="fl-pos-other"
+                            placeholder="Type to search position..."
+                            oninput="debounceSearch()"
+                            style="display: none; width: 100%; margin-top: 8px;">
+                    </div>
+
+                    <div id="fl-date-wrap"
+                        style="display: flex; width: 100%; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--card-bg); overflow: hidden; align-items: stretch; transition: 0.2s;">
+                        <input type="text" id="fl-date"
+                            placeholder="Filter by date" data-input
+                            style="flex: 1; border: none; outline: none; padding: 10px 14px; background: transparent; font-family: inherit; font-size: 13px; color: var(--text-main); width: 100%;">
+                        <button type="button" title="Clear Date" data-clear
+                            style="background: transparent; border: none; border-left: 1px solid var(--border-light); cursor: pointer; color: var(--text-muted); padding: 0 14px; font-size: 14px; transition: 0.2s;"
+                            onmouseover="this.style.color='var(--danger)'"
+                            onmouseout="this.style.color='var(--text-muted)'">✕</button>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <input class="filter-select" type="text" id="fl-search"
+                            placeholder="Search outlet..."
+                            oninput="debounceSearch()" style="width: 100%;">
+                    </div>
+                </div>
+
+                <div id="visit-list-loading" style="display: none;">
+                    <div class="skeleton-card"><div class="skeleton-header"><div
+                                class="skeleton-title"></div><div
+                                class="skeleton-date"></div></div><div
+                            class="skeleton-meta"><div
+                                class="skeleton-badge"></div><div
+                                class="skeleton-text"></div></div><div
+                            class="skeleton-body"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-header"><div
+                                class="skeleton-title"></div><div
+                                class="skeleton-date"></div></div><div
+                            class="skeleton-meta"><div
+                                class="skeleton-badge"></div><div
+                                class="skeleton-text"></div></div><div
+                            class="skeleton-body"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-header"><div
+                                class="skeleton-title"></div><div
+                                class="skeleton-date"></div></div><div
+                            class="skeleton-meta"><div
+                                class="skeleton-badge"></div><div
+                                class="skeleton-text"></div></div><div
+                            class="skeleton-body"></div></div>
+                </div>
+
+                <div class="visit-list" id="visit-list"></div>
+                <div id="pagination-container"
+                    style="margin: 20px 0 24px 0;"></div>
+            </div>
+
+        </div>
+
+        <div class="camera-modal" id="camera-modal">
+            <div class="camera-header" id="camera-header">
+                <span id="modal-photo-counter"
+                    style="color: #FFF; font-weight: 500; font-size: 14px; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 12px;">0
+                    / 10</span>
+                <button class="btn-close-modal"
+                    onclick="stopCamera()">Done</button>
+            </div>
+            <div class="camera-body" id="camera-body">
+                <video id="camera-view" autoplay playsinline></video>
+            </div>
+            <div class="camera-footer" id="camera-footer">
+                <div class="camera-recent-thumb" id="camera-recent-thumb"
+                    onclick="openCameraGallery()" title="View Gallery"></div>
+                <button class="btn-capture-round"
+                    onclick="capturePhoto()"></button>
+                <div class="camera-spacer">
+                    <button class="btn-flip-camera" onclick="toggleCamera()"
+                        title="Switch Camera">
+                        <svg width="24" height="24" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"><polyline
+                                points="1 4 1 10 7 10"></polyline><polyline
+                                points="23 20 23 14 17 14"></polyline><path
+                                d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10"></path><path
+                                d="M3.51 15A9 9 0 0 0 18.36 18.36L23 14"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <canvas id="camera-canvas" style="display: none;"></canvas>
+
+            <div class="camera-gallery" id="camera-gallery">
+                <div class="cg-header">
+                    <button class="btn-close-modal"
+                        onclick="closeCameraGallery()">◀ Back to Camera</button>
+                    <div style="width:120px"></div>
+                </div>
+                <div class="cg-grid" id="cg-grid"></div>
+            </div>
+        </div>
+
+        <div class="detail-overlay" id="detail-overlay"
+            onclick="if(event.target===this)closeDetail()">
+            <div class="detail-box">
+                <button class="detail-close" onclick="closeDetail()">✕</button>
+                <div id="detail-content"></div>
+            </div>
+        </div>
+
+        <div class="confirm-overlay" id="save-confirm-overlay"
+            onclick="if(event.target===this)closeSaveConfirm()">
+            <div class="confirm-box"
+                style="padding: 1.5rem; max-width: 480px; position: relative;">
+                <button class="detail-close" onclick="closeSaveConfirm()"
+                    style="position: absolute; top: 16px; right: 16px;">✕</button>
+                <h3
+                    style="margin-bottom: 1rem; color: var(--text-main); font-size: 16px; font-weight: 600;">Review
+                    Visit Details</h3>
+                <div id="save-confirm-text"
+                    style="margin-bottom: 1.5rem; text-align: left;"></div>
+                <div class="confirm-actions" id="save-confirm-actions">
+                    <button class="btn-secondary"
+                        onclick="enableModalEdit()">Edit</button>
+                    <button class="btn-primary" onclick="executeSave()">Confirm
+                        & Save</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="confirm-overlay" id="delete-confirm-overlay"
+            onclick="if(event.target===this)closeDeleteRequest()">
+            <div class="confirm-box">
+                <h3
+                    style="margin-bottom: 12px; font-size: 18px; color: var(--danger);">Delete
+                    Request</h3>
+                <p
+                    style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;">Reason
+                    for delete request:</p>
+                <textarea id="delete-reason-input" rows="3"
+                    placeholder="e.g., Duplicated entry..."
+                    style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid var(--border-light); border-radius: 6px; font-family: inherit; font-size: 14px; resize: none; background: var(--bg-color); color: var(--text-main);"></textarea>
+                <div class="confirm-actions">
+                    <button class="btn-secondary"
+                        onclick="closeDeleteRequest()">Cancel</button>
+                    <button class="btn-primary btn-danger"
+                        onclick="executeDeleteRequest()">Confirm Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="lightbox" id="lightbox" onclick="closeLightbox()"><img
+                id="lb-img" src alt="Photo"></div>
+        <div class="toast" id="toast"></div>
+
+        <script
+            src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="app.js"></script>
+
+        <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.error('PWA Registration failed:', err));
+            });
+        }
+    </script>
+
+        <template id="visit-card-template">
+            <div class="visit-card" style="padding: 1.25rem;">
+                <!-- แถวบน: วันที่ และ สถานะการลบ -->
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 12px;">
+                    <div style="flex: 1;">
+                        <!-- ⚠️ ต้องมีคลาส tpl-outlet -->
+                        <h3 class="tpl-outlet"
+                            style="font-size: 17px; font-weight: 700; color: var(--text-main); margin: 0; line-height: 1.3;"></h3>
+                        <!-- ⚠️ ต้องมีคลาส tpl-area -->
+                        <span class="badge badge-area tpl-area"
+                            style="font-size: 9px; padding: 2px 8px; margin-top: 4px; opacity: 0.8;"></span>
+                    </div>
+                    <div
+                        style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                        <!-- ⚠️ ต้องมีคลาส tpl-date -->
+                        <div class="vc-date tpl-date"
+                            style="font-size: 11px; font-weight: 600; color: var(--primary); white-space: nowrap;"></div>
+                        <!-- ⚠️ ต้องมีคลาส tpl-status-badge -->
+                        <div class="tpl-status-badge"></div>
+                    </div>
+                </div>
+
+                <!-- ⚠️ ต้องมีคลาส tpl-thumbs และคลาสเหล่านี้เพื่อป้องกัน Error ใน JS -->
+                <div class="tpl-thumbs"
+                    style="margin-top: 8px; border-top: 1px solid var(--border-light); padding-top: 12px;"></div>
+
+                <!-- ⚠️ เพิ่มคลาสที่เหลือซ่อนไว้ เพื่อไม่ให้ JS ทำงานพลาด (สำคัญมาก) -->
+                <span class="tpl-person" style="display:none"></span>
+                <span class="tpl-pos" style="display:none"></span>
+                <div class="tpl-reason" style="display:none"></div>
+            </div>
+        </template>
+
+    </body>
+</html>
