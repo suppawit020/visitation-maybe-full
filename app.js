@@ -18,6 +18,7 @@ const CONFIG = {
 };
 
 const TEAM_STRUCTURE = {
+    'Admin': ['Admin'],
     'Horeca': ['BKK', 'EAST'],
     'On Premise': ['BKK', 'EAST', 'North+Northeast'],
     'Southern': ['Phuket-HRC', 'Phuket-OP', 'Samui-HRC', 'Samui-OP']
@@ -42,7 +43,7 @@ let AppState = {
     fpDate: null,
     fpNextDate: null,
     fpFilterDate: null,
-    isClearingForm: false // ป้องกัน Autosave ทำงานตอนกดล้างฟอร์ม
+    isClearingForm: false
 };
 
 // ============================================================
@@ -105,13 +106,10 @@ function initApp() {
     });
 
     bindPositionToggle();
-
-    // Auto-fill Team & Sub-Team from logged-in user's profile and lock the fields
     prefillAndLockTeamFields();
 
     document.getElementById('profile-menu-wrap').style.display = 'block';
     
-    // Set Profile UI
     const localProfile = JSON.parse(localStorage.getItem(CONFIG.KEYS.PROFILE)) || AppState.userProfile;
     AppState.userProfile.avatar = localProfile.avatar || '';
 
@@ -125,7 +123,6 @@ function initApp() {
     document.getElementById('pd-team').textContent = AppState.userProfile.team || 'No Team';
     const subTeamEl = document.getElementById('pd-sub-team');
     if (subTeamEl) subTeamEl.textContent = AppState.userProfile.subTeam || '-';
-    // Area/Role row removed from profile display
     document.getElementById('pd-contact').textContent = AppState.userProfile.contact || '-';
 
     loadAvatarUI();
@@ -150,7 +147,6 @@ function initApp() {
     }
 }
 
-// Auto-fill Team & Sub-Team from the logged-in user's profile, then lock the fields
 function prefillAndLockTeamFields() {
     const mainTeam = AppState.userProfile.team || '';
     const localProfile = JSON.parse(localStorage.getItem(CONFIG.KEYS.PROFILE)) || {};
@@ -190,20 +186,32 @@ async function loadCustomerDropdown() {
         let query = AppState.supabaseClient
             .from('customer_information')
             .select('customer_id, name_of_outlet')
-            .eq('status', 'ACTIVE')
+            .neq('status', 'INACTIVE') 
             .order('name_of_outlet', { ascending: true });
 
-        // Filter to only outlets assigned to this BDE
         const empId = AppState.userProfile.empId;
         const bdeName = AppState.userProfile.name;
-        if (empId) {
-            query = query.eq('user_id', empId);
-        } else if (bdeName) {
-            query = query.eq('bde', bdeName);
+        
+        // 1. เช็คสิทธิ์ Admin จาก "Team" อย่างเดียว
+        const team = (AppState.userProfile.team || '').trim().toLowerCase();
+        const isAdmin = (team === 'admin');
+
+        if (!isAdmin) {
+            // 2. ถ้าเป็น BDE ให้ใช้ตรรกะเดิม (หาจากรหัส หรือ ชื่อ ก็ได้ เพื่อกันข้อมูลเก่าตกหล่น)
+            if (empId && bdeName) {
+                query = query.or(`user_id.eq.${empId},bde.eq.${bdeName}`);
+            } else if (empId) {
+                query = query.eq('user_id', empId);
+            } else if (bdeName) {
+                query = query.eq('bde', bdeName);
+            }
         }
 
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase Query Error:", error);
+            throw error;
+        }
 
         const selectEl = document.getElementById('f-customer');
         if (!selectEl) return;
@@ -220,16 +228,15 @@ async function loadCustomerDropdown() {
             outletName: c.name_of_outlet
         }));
 
-        // Initialize Tom Select with search
         AppState.tomSelectCustomer = new TomSelect(selectEl, {
             options: options,
             items: [],
             valueField: 'value',
             labelField: 'text',
             searchField: ['text', 'searchText'],
-            placeholder: '-- Select outlet --',
+            placeholder: options.length > 0 ? '-- Select outlet --' : 'ไม่พบรายชื่อร้านค้า',
             allowEmptyOption: true,
-            maxOptions: 200,
+            maxOptions: 500, 
             maxItems: 1,
             plugins: ['clear_button'],
             render: {
@@ -380,11 +387,29 @@ async function loadVisitsFromDB() {
         let visitsQuery = AppState.supabaseClient.from('visitation').select('*');
         let countQuery = AppState.supabaseClient.from('visitation').select('*', { count: 'exact', head: true });
 
-        // กรองเฉพาะข้อมูลที่ User ปัจจุบันเป็นคนบันทึก
-        const currentUserId = AppState.userProfile.empId || (AppState.loggedInUser ? AppState.loggedInUser.id : null);
-        if (currentUserId) {
-            visitsQuery = visitsQuery.eq('user_id', currentUserId);
-            countQuery = countQuery.eq('user_id', currentUserId);
+        // 🌟 แก้ไข: ดึงข้อมูลชื่อและรหัสพนักงานมาเตรียมไว้
+        const empId = AppState.userProfile.empId;
+        const bdeName = AppState.userProfile.name;
+        const team = (AppState.userProfile.team || '').trim().toLowerCase();
+        const isAdmin = (team === 'admin');
+        
+        if (!isAdmin) {
+            // 🔒 บังคับกรองเฉพาะงานของตัวเองอย่างเด็ดขาด!
+            if (empId && bdeName) {
+                const userFilter = `user_id.eq.${empId},bde.eq.${bdeName}`;
+                visitsQuery = visitsQuery.or(userFilter);
+                countQuery = countQuery.or(userFilter);
+            } else if (empId) {
+                visitsQuery = visitsQuery.eq('user_id', empId);
+                countQuery = countQuery.eq('user_id', empId);
+            } else if (bdeName) {
+                visitsQuery = visitsQuery.eq('bde', bdeName);
+                countQuery = countQuery.eq('bde', bdeName);
+            } else {
+                // ดักบั๊กขั้นสุด: ถ้าแอคเคาน์ไหนไม่มีทั้งชื่อและรหัส บังคับซ่อนข้อมูลทั้งหมด!
+                visitsQuery = visitsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+                countQuery = countQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+            }
         }
 
         const filterArea = document.getElementById('fl-area') ? document.getElementById('fl-area').value : '';
@@ -405,7 +430,6 @@ async function loadVisitsFromDB() {
             countQuery = countQuery.or(searchQ);
         }
 
-        // เรียงลำดับจากวันที่ออกตลาด (ใหม่ไปเก่า)
         visitsQuery = visitsQuery.order('date_visit', { ascending: false }).range(rangeStart, rangeEnd);
 
         const [visitsRes, countRes] = await Promise.all([ visitsQuery, countQuery ]);
@@ -414,6 +438,18 @@ async function loadVisitsFromDB() {
 
         AppState.totalCount = countRes.count || 0;
         AppState.totalPages = Math.max(1, Math.ceil(AppState.totalCount / CONFIG.PAGE_SIZE));
+
+        const userIds = [...new Set((visitsRes.data || []).map(v => v.user_id).filter(Boolean))];
+        let usersMap = {};
+        if (userIds.length > 0) {
+            const { data: usersData } = await AppState.supabaseClient
+                .from('user_information')
+                .select('user_id, sub_team')
+                .in('user_id', userIds);
+            if (usersData) {
+                usersData.forEach(u => usersMap[u.user_id] = u.sub_team);
+            }
+        }
 
         const formatted = (visitsRes.data || []).map(v => {
             let parsedPhotos = [];
@@ -443,12 +479,13 @@ async function loadVisitsFromDB() {
                 reason: extractedReason,      
                 result: v.visit_result || '',
                 photos: parsedPhotos,
-                creatorName: v.bde || AppState.userProfile.name || '', 
+                creatorName: v.bde || 'Unknown BDE', 
                 creatorEmail: '',
                 creatorPosition: '',
                 is_deleted: v.is_deleted === true,
                 delete_reason: v.delete_reason || '',
-                req_status: v.req_status || null 
+                req_status: v.req_status || null,
+                userArea: usersMap[v.user_id] || ''
             };
         });
 
@@ -791,8 +828,10 @@ window.triggerSaveConfirm = function() {
         const el = document.getElementById(field.id);
         if (!el || !el.value.trim()) {
             toast(`Please fill in: ${field.name}`, false);
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); 
-            el.classList.add('error-highlight'); setTimeout(() => el.classList.remove('error-highlight'), 2500);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); 
+                el.classList.add('error-highlight'); setTimeout(() => el.classList.remove('error-highlight'), 2500);
+            }
             return;
         }
     }
@@ -885,15 +924,28 @@ window.executeSave = async function() {
         if (AppState.photos.length === 0) { toast('Please add at least 1 photo before saving.', false); return; }
     }
 
-    document.getElementById('save-confirm-overlay').classList.remove('open');
-    if (!AppState.supabaseClient) { alert('❌ ยังไม่ได้เชื่อมต่อฐานข้อมูล'); return; }
+    if (!AppState.supabaseClient) { 
+        toast('❌ Database connection lost. Please refresh.', false); 
+        return; 
+    }
 
-    const saveBtn = document.getElementById('btn-save');
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; toast('Uploading data...', true);
+    const saveBtn = document.querySelector('#save-confirm-actions .btn-primary'); 
+    const originalBtnText = saveBtn ? saveBtn.textContent : 'Confirm & Save';
+    
+    if (saveBtn) {
+        saveBtn.disabled = true; 
+        saveBtn.textContent = 'Saving...'; 
+    }
+    toast('Uploading data...', true);
 
     try {
         const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString();
+        
         const newUploadedUrls = await uploadPhotosToStorage(id);
+        
+        if (newUploadedUrls.length === 0 && AppState.photos.length > 0) {
+            throw new Error("Failed to upload photos. Please check your connection.");
+        }
 
         const payload = {
             id: id, 
@@ -903,19 +955,35 @@ window.executeSave = async function() {
             visit_report: `[Person Met: ${AppState.pendingSaveData.person} - ${AppState.pendingSaveData.position}]\n\n${AppState.pendingSaveData.reason}`, 
             visit_result: AppState.pendingSaveData.result, 
             visit_capture: JSON.stringify(newUploadedUrls),
-            user_id: AppState.userProfile.empId || AppState.loggedInUser.id, 
+            user_id: AppState.userProfile.empId || (AppState.loggedInUser ? AppState.loggedInUser.id : ''), 
             team: AppState.pendingSaveData.mainTeam, 
             bde: AppState.userProfile.name,
             status: 'COMPLETED'
         };
 
         const { error } = await AppState.supabaseClient.from('visitation').insert([payload]);
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase Insert Error:", error);
+            throw new Error(error.message || "Failed to insert record into database.");
+        }
 
         toast('✅ Visitation record saved successfully!');
-        window.clearForm(); await loadVisitsFromDB(); window.switchTab('list');
-    } catch (err) { console.error(err); toast('Failed to save: ' + err.message, false); } 
-    finally { saveBtn.disabled = false; saveBtn.textContent = 'Save Visit'; AppState.pendingSaveData = null; }
+        document.getElementById('save-confirm-overlay').classList.remove('open');
+        window.clearForm(); 
+        
+        AppState.currentPage = 0;
+        await loadVisitsFromDB(); 
+        window.switchTab('list');
+        
+    } catch (err) { 
+        console.error("Save Execution Error:", err); 
+        toast('Failed to save: ' + err.message, false); 
+    } finally { 
+        if (saveBtn) {
+            saveBtn.disabled = false; 
+            saveBtn.textContent = originalBtnText; 
+        }
+    }
 }
 
 // ============================================================
@@ -1015,11 +1083,9 @@ window.openDetail = function(id) {
             <div class="detail-label" style="margin-bottom:12px;">ATTACHED PHOTOS (${v.photos.length})</div>
             <div class="detail-photos">${v.photos.map(p => `<div class="detail-photo" onclick="window.openLightbox('${p}')"><img src="${p}" style="cursor:zoom-in;"></div>`).join('')}</div>` : '';
         
-        // --- 1. เพิ่มโค้ดดึงข้อมูล Team และ Area มาเตรียมไว้ (ใส่ไว้ก่อน const creatorHtml) ---
-        const userTeam = AppState.userProfile.team || v.area || 'Unknown Team';
-        const userArea = AppState.userProfile.subTeam ? ` • ${AppState.userProfile.subTeam}` : '';
+        const userTeam = v.area || 'Unknown Team';
+        const userArea = v.userArea ? ` • ${v.userArea}` : ''; // 🌟 ดึงตัวแปร userArea มาแสดงผล
 
-        // --- 2. แก้ไขส่วนสร้าง HTML ของ creatorHtml ---
         const creatorHtml = `
             <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border-light);">
                 <div class="detail-label" style="margin-bottom:12px;">RECORDED BY</div>
@@ -1029,7 +1095,6 @@ window.openDetail = function(id) {
                     </div>
                     <div>
                         <div style="font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">${esc(v.creatorName || 'Unknown')}</div>
-                        <!-- บรรทัดที่เพิ่มใหม่เพื่อให้แสดง Team และ Area -->
                         <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500;">
                             ${esc(userTeam)}${esc(userArea)}
                         </div>
@@ -1049,7 +1114,6 @@ window.openDetail = function(id) {
             ${isPending ? `<div class="pending-warning" style="margin-bottom: 24px;"><strong>⚠️ Pending deletion review.</strong><div>Reason: ${esc(v.delete_reason)}</div></div>` : ''}
             
             <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-light);">
-                <!-- ส่วนบน: วันที่ และ ทีม -->
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="detail-label" style="margin: 0;">DATE:</span>
@@ -1061,7 +1125,6 @@ window.openDetail = function(id) {
                     </div>
                 </div>
 
-                <!-- ส่วนล่าง: ชื่อร้าน (เน้นตัวใหญ่ชัดเจน) -->
                 <div>
                     <div class="detail-label" style="margin-bottom: 4px;">OUTLET / LOCATION</div>
                     <h2 style="font-size: 22px; font-weight: 700; color: var(--text-main); margin: 0; line-height: 1.2;">${esc(v.outlet)}</h2>
@@ -1121,14 +1184,6 @@ window.renderConfirmModal = function() {
 }
 
 window.enableModalEdit = function() {
-    const mainTeams = Object.keys(TEAM_STRUCTURE);
-    const mainTeamOptions = mainTeams.map(t => `<option value="${t}" ${t===AppState.pendingSaveData.mainTeam?'selected':''}>${t}</option>`).join('');
-    
-    let subTeamOptions = '';
-    if (TEAM_STRUCTURE[AppState.pendingSaveData.mainTeam]) {
-        subTeamOptions = TEAM_STRUCTURE[AppState.pendingSaveData.mainTeam].map(s => `<option value="${s}" ${s===AppState.pendingSaveData.subTeam?'selected':''}>${s}</option>`).join('');
-    }
-
     const positions = ['CEO', 'CFO', 'OWNER', 'BARTENDER', 'F&B MANAGER', 'MANAGER'];
     const isOtherPos = AppState.pendingSaveData.position && !positions.includes(AppState.pendingSaveData.position);
     const posOptions = positions.map(p => `<option value="${p}" ${p === AppState.pendingSaveData.position ? 'selected' : ''}>${p}</option>`).join('');
@@ -1145,20 +1200,18 @@ window.enableModalEdit = function() {
                 <label style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; display: block;">Customer / Outlet</label>
                 <input type="text" id="m-outlet" value="${esc(AppState.pendingSaveData.outlet)}" readonly style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; background: rgba(0,0,0,0.05); color: var(--text-main); cursor: not-allowed;">
             </div>
+            
             <div style="display: flex; gap: 10px;">
                 <div style="flex: 1;">
                     <label style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; display: block;">Team</label>
-                    <select id="m-main-team" onchange="window.updateModalSubTeam(this.value)" style="width: 100%; padding: 10px 14px; border: 1px solid var(--primary); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; background: transparent; color: var(--text-main);">
-                        ${mainTeamOptions}
-                    </select>
+                    <input type="text" id="m-main-team" value="${esc(AppState.pendingSaveData.mainTeam)}" readonly style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; background: rgba(0,0,0,0.05); color: var(--text-main); cursor: not-allowed;">
                 </div>
                 <div style="flex: 1;">
                     <label style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; display: block;">Area / Sub-Team</label>
-                    <select id="m-sub-team" style="width: 100%; padding: 10px 14px; border: 1px solid var(--primary); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; background: transparent; color: var(--text-main);">
-                        ${subTeamOptions}
-                    </select>
+                    <input type="text" id="m-sub-team" value="${esc(AppState.pendingSaveData.subTeam)}" readonly style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; background: rgba(0,0,0,0.05); color: var(--text-main); cursor: not-allowed;">
                 </div>
             </div>
+
             <div>
                 <label style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; display: block;">Date</label>
                 <input type="text" id="m-date" value="${AppState.pendingSaveData.date}" style="width: 100%; padding: 10px 14px; border: 1px solid var(--primary); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; background: transparent; color: var(--text-main);">
