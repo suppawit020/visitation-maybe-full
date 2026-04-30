@@ -384,8 +384,10 @@ async function loadVisitsFromDB() {
         const rangeStart = AppState.currentPage * CONFIG.PAGE_SIZE;
         const rangeEnd = (AppState.currentPage + 1) * CONFIG.PAGE_SIZE - 1;
 
-        let visitsQuery = AppState.supabaseClient.from('visitation').select('*');
-        let countQuery = AppState.supabaseClient.from('visitation').select('*', { count: 'exact', head: true });
+        // กรองออก: record ที่ถูก approve delete ไปแล้ว (req_status = 'approved')
+        // ต้องใช้ .or เพราะ Supabase จะไม่รวม NULL rows เมื่อใช้ .neq อย่างเดียว
+        let visitsQuery = AppState.supabaseClient.from('visitation').select('*').or('req_status.is.null,req_status.neq.approved');
+        let countQuery = AppState.supabaseClient.from('visitation').select('*', { count: 'exact', head: true }).or('req_status.is.null,req_status.neq.approved');
 
         // 🌟 แก้ไข: ดึงข้อมูลชื่อและรหัสพนักงานมาเตรียมไว้
         const empId = AppState.userProfile.empId;
