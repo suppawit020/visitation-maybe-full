@@ -1410,3 +1410,4 @@ body.dark-mode .ts-wrapper .ts-control input {
 body.dark-mode .ts-wrapper .ts-control input::placeholder {
     color: var(--text-muted) !important;
 }
+
