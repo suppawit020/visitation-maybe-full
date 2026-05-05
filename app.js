@@ -14,7 +14,64 @@ const CONFIG = {
     },
     PAGE_SIZE: 5,
     MAX_PHOTOS: 10,
-    ALLOW_LIBRARY_UPLOAD: true 
+    ALLOW_LIBRARY_UPLOAD: true
+};
+
+// ============================================================
+// SUPABASE REST CLIENT (ไม่ใช้ Auth SDK — เรียก REST ตรงๆ)
+// ============================================================
+const DB = {
+    async query(path, opts = {}) {
+        const res = await fetch(CONFIG.SUPABASE.URL + '/rest/v1/' + path, {
+            ...opts,
+            cache: 'no-store',
+            headers: {
+                'apikey': CONFIG.SUPABASE.KEY,
+                'Authorization': 'Bearer ' + CONFIG.SUPABASE.KEY,
+                'Content-Type': 'application/json',
+                'Prefer': opts.prefer || 'return=representation',
+                ...opts.headers
+            }
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(`DB Error ${res.status}: ${text.substring(0, 200)}`);
+        return text ? JSON.parse(text) : null;
+    },
+
+    async select(table, params = '') {
+        return this.query(`${table}?${params}`);
+    },
+
+    async insert(table, payload) {
+        return this.query(table, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    },
+
+    async update(table, params, payload) {
+        return this.query(`${table}?${params}`, {
+            method: 'PATCH',
+            prefer: 'return=minimal',
+            body: JSON.stringify(payload)
+        });
+    },
+
+    // Supabase Storage upload (ยังคงใช้ fetch ตรงๆ)
+    async uploadFile(bucket, path, blob, contentType = 'image/jpeg') {
+        const res = await fetch(`${CONFIG.SUPABASE.URL}/storage/v1/object/${bucket}/${path}`, {
+            method: 'POST',
+            headers: {
+                'apikey': CONFIG.SUPABASE.KEY,
+                'Authorization': 'Bearer ' + CONFIG.SUPABASE.KEY,
+                'Content-Type': contentType,
+                'x-upsert': 'false'
+            },
+            body: blob
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error(t); }
+        return `${CONFIG.SUPABASE.URL}/storage/v1/object/public/${bucket}/${path}`;
+    }
 };
 
 const TEAM_STRUCTURE = {
@@ -36,7 +93,6 @@ let AppState = {
     deleteTargetId: null,
     tomSelectCustomer: null,
     loggedInUser: null,
-    supabaseClient: null,
     realtimeChannel: null,
     totalPages: 1,
     totalCount: 0,
@@ -49,44 +105,36 @@ let AppState = {
 // ============================================================
 // INITIALIZATION & SESSION
 // ============================================================
-try {
-    if (typeof window.supabase !== 'undefined') {
-        AppState.supabaseClient = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
-    }
-} catch (e) {
-    console.error("Supabase Connection error:", e);
-}
-
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     initDarkMode();
-    checkSession();
+    await checkSession();
 });
 
-function checkSession() {
+async function checkSession() {
     try {
-        const raw = sessionStorage.getItem(CONFIG.KEYS.SESSION) || localStorage.getItem(CONFIG.KEYS.REMEMBER);
-        if (!raw) return false;
+        const rawProfile = localStorage.getItem(CONFIG.KEYS.PROFILE);
+        const hasSession = localStorage.getItem(CONFIG.KEYS.REMEMBER) || sessionStorage.getItem(CONFIG.KEYS.SESSION);
 
-        const data = JSON.parse(raw);
-        if (!data?.id) return false;
+        if (!rawProfile || !hasSession) return false;
 
-        AppState.loggedInUser = data;
-        const localProfile = JSON.parse(localStorage.getItem(CONFIG.KEYS.PROFILE)) || {};
-        
-        AppState.userProfile = { 
+        const localProfile = JSON.parse(rawProfile);
+        if (!localProfile.empId && !localProfile.name) return false;
+
+        AppState.userProfile = {
             empId: localProfile.empId || '',
-            name: data.name, 
-            email: localProfile.email || data.username, 
+            name: localProfile.name || '',
+            email: localProfile.email || '',
             team: localProfile.team || '',
             subTeam: localProfile.subTeam || '',
-            area: localProfile.area || data.position, 
+            area: localProfile.area || '',
             contact: localProfile.contact || '-',
-            avatar: localProfile.avatar || '' 
+            avatar: localProfile.avatar || ''
         };
-        
+
         showMainApp();
         return true;
     } catch (e) {
+        console.error("Session check error:", e);
         return false;
     }
 }
@@ -141,10 +189,8 @@ function initApp() {
     loadAutoSaveData();
     switchTab('new');
 
-    if (AppState.supabaseClient) {
-        loadVisitsFromDB();
-        setupRealtime();
-    }
+    loadVisitsFromDB();
+    setupRealtime();
 }
 
 function prefillAndLockTeamFields() {
@@ -181,37 +227,20 @@ function prefillAndLockTeamFields() {
 }
 
 async function loadCustomerDropdown() {
-    if (!AppState.supabaseClient) return;
     try {
-        let query = AppState.supabaseClient
-            .from('customer_information')
-            .select('customer_id, name_of_outlet')
-            .neq('status', 'INACTIVE') 
-            .order('name_of_outlet', { ascending: true });
-
-        const empId = AppState.userProfile.empId;
-        const bdeName = AppState.userProfile.name;
-        
-        // 1. เช็คสิทธิ์ Admin จาก "Team" อย่างเดียว
         const team = (AppState.userProfile.team || '').trim().toLowerCase();
         const isAdmin = (team === 'admin');
+        const empId = AppState.userProfile.empId;
+        const bdeName = AppState.userProfile.name;
 
+        let params = `select=customer_id,name_of_outlet&status=neq.INACTIVE&order=customer_id.asc`;
         if (!isAdmin) {
-            // 2. ถ้าเป็น BDE ให้ใช้ตรรกะเดิม (หาจากรหัส หรือ ชื่อ ก็ได้ เพื่อกันข้อมูลเก่าตกหล่น)
-            if (empId && bdeName) {
-                query = query.or(`user_id.eq.${empId},bde.eq.${bdeName}`);
-            } else if (empId) {
-                query = query.eq('user_id', empId);
-            } else if (bdeName) {
-                query = query.eq('bde', bdeName);
-            }
+            if (empId && bdeName) params += `&or=(user_id.eq.${encodeURIComponent(empId)},bde.eq.${encodeURIComponent(bdeName)})`;
+            else if (empId) params += `&user_id=eq.${encodeURIComponent(empId)}`;
+            else if (bdeName) params += `&bde=eq.${encodeURIComponent(bdeName)}`;
         }
 
-        const { data, error } = await query;
-        if (error) {
-            console.error("Supabase Query Error:", error);
-            throw error;
-        }
+        const data = await DB.select('customer_information', params);
 
         const selectEl = document.getElementById('f-customer');
         if (!selectEl) return;
@@ -234,9 +263,10 @@ async function loadCustomerDropdown() {
             valueField: 'value',
             labelField: 'text',
             searchField: ['text', 'searchText'],
+            sortField: { field: 'value', direction: 'asc' },
             placeholder: options.length > 0 ? '-- Select outlet --' : 'ไม่พบรายชื่อร้านค้า',
             allowEmptyOption: true,
-            maxOptions: 500, 
+            maxOptions: 500,
             maxItems: 1,
             plugins: ['clear_button'],
             render: {
@@ -274,52 +304,80 @@ window.handleFilterPosChange = function() {
 // AUTHENTICATION MODULE
 // ============================================================
 window.doUserLogin = async function() {
-    const username = document.getElementById('login-username').value.trim();
+    const usernameInput = document.getElementById('login-username').value.trim();
     const pass = document.getElementById('login-pass').value;
     const remember = document.getElementById('login-remember').checked;
     const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('btn-login');
     errEl.style.display = 'none';
 
-    if (!username || !pass) { errEl.textContent = 'Please enter username and password.'; errEl.style.display = 'block'; return; }
-    if (!AppState.supabaseClient) { errEl.textContent = 'Database not connected.'; errEl.style.display = 'block'; return; }
+    if (!usernameInput || !pass) {
+        errEl.textContent = 'Please enter username and password.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
 
     try {
-        const { data, error } = await AppState.supabaseClient.from('users').select('*').eq('username', username).eq('is_active', true).single();
+        // query user_information พร้อม join users เพื่อดึง password_hash
+        const data = await DB.select(
+            'user_information',
+            `select=*,users(id,password_hash,is_active)&username=eq.${encodeURIComponent(usernameInput)}&limit=1`
+        );
 
-        if (error || !data) { errEl.textContent = 'Username not found or inactive.'; errEl.style.display = 'block'; return; }
-        if (data.password_hash !== pass) { errEl.textContent = 'Incorrect password.'; errEl.style.display = 'block'; return; }
+        const info = data && data[0];
 
-        const { data: info, error: infoErr } = await AppState.supabaseClient.from('user_information').select('*').eq('users_id', data.id).single();
-
-        if (infoErr || !info) { errEl.textContent = 'Profile info not found. Please contact admin.'; errEl.style.display = 'block'; return; }
-
-        AppState.loggedInUser = data;
-        AppState.userProfile = { 
-            empId: info.user_id,
-            name: info.name, 
-            email: info.email, 
-            team: info.team,       
-            subTeam: info.sub_team, 
-            area: info.level,      
-            contact: info.contact || '-',
-            avatar: '' 
-        };
-        
-        const sessionPayload = JSON.stringify(data);
-        const profilePayload = JSON.stringify(AppState.userProfile);
-
-        if (remember) {
-            localStorage.setItem(CONFIG.KEYS.REMEMBER, sessionPayload);
-            localStorage.setItem(CONFIG.KEYS.PROFILE, profilePayload);
-        } else {
-            sessionStorage.setItem(CONFIG.KEYS.SESSION, sessionPayload);
-            localStorage.setItem(CONFIG.KEYS.PROFILE, profilePayload);
+        if (!info) {
+            errEl.textContent = 'Invalid username or password.';
+            errEl.style.display = 'block';
+            return;
         }
 
-        showMainApp();
+        // ตรวจสอบ is_active
+        if (info.users && info.users.is_active === false) {
+            errEl.textContent = 'This account has been disabled. Please contact admin.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        // เทียบ password กับ password_hash ใน users table
+        const storedHash = info.users?.password_hash || '';
+        const isValid = storedHash === pass;
+        if (!isValid) {
+            errEl.textContent = 'Invalid username or password.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        AppState.userProfile = {
+            empId: info.user_id,
+            name: info.name,
+            email: info.email,
+            team: info.team,
+            subTeam: info.sub_team,
+            area: info.level,
+            contact: info.contact || '-',
+            avatar: ''
+        };
+
+        const profilePayload = JSON.stringify(AppState.userProfile);
+        localStorage.setItem(CONFIG.KEYS.PROFILE, profilePayload);
+
+        if (remember) {
+            localStorage.setItem(CONFIG.KEYS.REMEMBER, 'true');
+        } else {
+            localStorage.removeItem(CONFIG.KEYS.REMEMBER);
+            sessionStorage.setItem(CONFIG.KEYS.SESSION, 'true');
+        }
+
+        // เล่น Animation ก่อน แล้วค่อยเข้า showMainApp
+        playWelcomeAnimation(AppState.userProfile.name, showMainApp); 
     } catch (e) {
         errEl.textContent = 'Login failed: ' + e.message;
         errEl.style.display = 'block';
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
     }
 }
 
@@ -327,24 +385,30 @@ window.doUserLogout = function() {
     sessionStorage.removeItem(CONFIG.KEYS.SESSION);
     localStorage.removeItem(CONFIG.KEYS.REMEMBER);
     localStorage.removeItem(CONFIG.KEYS.PROFILE);
-    
+
+    // ยกเลิก Realtime channel ถ้ามี
+    if (AppState.realtimeChannel) {
+        try { AppState.realtimeChannel.unsubscribe(); } catch(e) {}
+        AppState.realtimeChannel = null;
+    }
+
     AppState.loggedInUser = null;
     AppState.userProfile = { empId: '', name: '', email: '', team: '', area: '', contact: '', avatar: '' };
     AppState.visits = [];
     AppState.photos = [];
-    
+
     stopCamera();
     document.getElementById('profile-menu-wrap').style.display = 'none';
     document.getElementById('profile-dropdown').classList.remove('show');
     loadAvatarUI();
-    
+
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('login-username').value = '';
     document.getElementById('login-pass').value = '';
     document.getElementById('login-remember').checked = false;
     document.getElementById('login-error').style.display = 'none';
-    
+
     document.getElementById('login-pass').type = 'password';
     document.getElementById('eye-icon').innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
 }
@@ -368,8 +432,7 @@ window.togglePasswordVisibility = function() {
 
 window.resetAndFetch = function() {
     AppState.currentPage = 0;
-    if (AppState.supabaseClient) fetchVisitsWithSkeleton();
-    else window.renderList();
+    fetchVisitsWithSkeleton();
 }
 
 let searchTimeout;
@@ -379,90 +442,75 @@ window.debounceSearch = function() {
 }
 
 async function loadVisitsFromDB() {
-    if (!AppState.supabaseClient) return;
     try {
         const rangeStart = AppState.currentPage * CONFIG.PAGE_SIZE;
         const rangeEnd = (AppState.currentPage + 1) * CONFIG.PAGE_SIZE - 1;
 
-        // กรองออก: record ที่ถูก approve delete ไปแล้ว (req_status = 'approved')
-        // ต้องใช้ .or เพราะ Supabase จะไม่รวม NULL rows เมื่อใช้ .neq อย่างเดียว
-        let visitsQuery = AppState.supabaseClient.from('visitation').select('*').or('req_status.is.null,req_status.neq.approved');
-        let countQuery = AppState.supabaseClient.from('visitation').select('*', { count: 'exact', head: true }).or('req_status.is.null,req_status.neq.approved');
-
-        // 🌟 แก้ไข: ดึงข้อมูลชื่อและรหัสพนักงานมาเตรียมไว้
         const empId = AppState.userProfile.empId;
         const bdeName = AppState.userProfile.name;
         const team = (AppState.userProfile.team || '').trim().toLowerCase();
         const isAdmin = (team === 'admin');
-        
+
+        const filterArea = document.getElementById('fl-area')?.value || '';
+        const filterDate = document.getElementById('fl-date')?.value || '';
+        const filterSearch = document.getElementById('fl-search')?.value.toLowerCase().trim() || '';
+
+        // สร้าง base filter string
+        let filters = `or=(req_status.is.null,req_status.neq.approved)`;
+
         if (!isAdmin) {
-            // 🔒 บังคับกรองเฉพาะงานของตัวเองอย่างเด็ดขาด!
             if (empId && bdeName) {
-                const userFilter = `user_id.eq.${empId},bde.eq.${bdeName}`;
-                visitsQuery = visitsQuery.or(userFilter);
-                countQuery = countQuery.or(userFilter);
+                filters += `&or=(user_id.eq.${encodeURIComponent(empId)},bde.eq.${encodeURIComponent(bdeName)})`;
             } else if (empId) {
-                visitsQuery = visitsQuery.eq('user_id', empId);
-                countQuery = countQuery.eq('user_id', empId);
+                filters += `&user_id=eq.${encodeURIComponent(empId)}`;
             } else if (bdeName) {
-                visitsQuery = visitsQuery.eq('bde', bdeName);
-                countQuery = countQuery.eq('bde', bdeName);
+                filters += `&bde=eq.${encodeURIComponent(bdeName)}`;
             } else {
-                // ดักบั๊กขั้นสุด: ถ้าแอคเคาน์ไหนไม่มีทั้งชื่อและรหัส บังคับซ่อนข้อมูลทั้งหมด!
-                visitsQuery = visitsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
-                countQuery = countQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+                filters += `&id=eq.00000000-0000-0000-0000-000000000000`;
             }
         }
 
-        const filterArea = document.getElementById('fl-area') ? document.getElementById('fl-area').value : '';
-        const filterDate = document.getElementById('fl-date') ? document.getElementById('fl-date').value : '';
-        const filterSearch = document.getElementById('fl-search') ? document.getElementById('fl-search').value.toLowerCase().trim() : '';
+        if (filterArea) filters += `&team=eq.${encodeURIComponent(filterArea)}`;
+        if (filterDate) filters += `&date_visit=eq.${encodeURIComponent(filterDate)}`;
+        if (filterSearch) filters += `&or=(name_of_outlet.ilike.*${encodeURIComponent(filterSearch)}*,visit_report.ilike.*${encodeURIComponent(filterSearch)}*)`;
 
-        if (filterArea) {
-            visitsQuery = visitsQuery.eq('team', filterArea);
-            countQuery = countQuery.eq('team', filterArea);
-        }
-        if (filterDate) {
-            visitsQuery = visitsQuery.eq('date_visit', filterDate);
-            countQuery = countQuery.eq('date_visit', filterDate);
-        }
-        if (filterSearch) {
-            const searchQ = `name_of_outlet.ilike.%${filterSearch}%,visit_report.ilike.%${filterSearch}%`;
-            visitsQuery = visitsQuery.or(searchQ);
-            countQuery = countQuery.or(searchQ);
-        }
-
-        visitsQuery = visitsQuery.order('date_visit', { ascending: false }).range(rangeStart, rangeEnd);
-
-        const [visitsRes, countRes] = await Promise.all([ visitsQuery, countQuery ]);
-
-        if (visitsRes.error) throw visitsRes.error;
-
-        AppState.totalCount = countRes.count || 0;
+        // ดึงข้อมูลพร้อม count ในคราวเดียว
+        const countRes = await fetch(
+            `${CONFIG.SUPABASE.URL}/rest/v1/visitation?${filters}&select=id`,
+            {
+                cache: 'no-store',
+                headers: {
+                    'apikey': CONFIG.SUPABASE.KEY,
+                    'Authorization': 'Bearer ' + CONFIG.SUPABASE.KEY,
+                    'Prefer': 'count=exact'
+                }
+            }
+        );
+        AppState.totalCount = parseInt(countRes.headers.get('content-range')?.split('/')[1] || '0', 10);
         AppState.totalPages = Math.max(1, Math.ceil(AppState.totalCount / CONFIG.PAGE_SIZE));
 
-        const userIds = [...new Set((visitsRes.data || []).map(v => v.user_id).filter(Boolean))];
+        const visitsData = await DB.query(
+            `visitation?${filters}&select=*&order=date_visit.desc&limit=${CONFIG.PAGE_SIZE}&offset=${rangeStart}`,
+            { headers: { 'Range': `${rangeStart}-${rangeEnd}`, 'Range-Unit': 'items' } }
+        );
+
+        // ดึง sub_team ของ users ที่เกี่ยวข้อง
+        const userIds = [...new Set((visitsData || []).map(v => v.user_id).filter(Boolean))];
         let usersMap = {};
         if (userIds.length > 0) {
-            const { data: usersData } = await AppState.supabaseClient
-                .from('user_information')
-                .select('user_id, sub_team')
-                .in('user_id', userIds);
-            if (usersData) {
-                usersData.forEach(u => usersMap[u.user_id] = u.sub_team);
-            }
+            const usersData = await DB.select(
+                'user_information',
+                `select=user_id,sub_team&user_id=in.(${userIds.map(encodeURIComponent).join(',')})`
+            );
+            if (usersData) usersData.forEach(u => usersMap[u.user_id] = u.sub_team);
         }
 
-        const formatted = (visitsRes.data || []).map(v => {
+        const formatted = (visitsData || []).map(v => {
             let parsedPhotos = [];
             try { parsedPhotos = v.visit_capture ? JSON.parse(v.visit_capture) : []; } catch(e) {}
-            
-            let extractedPerson = '';
-            let extractedPosition = '';
-            let extractedReason = v.visit_report || '';
-            
+
+            let extractedPerson = '', extractedPosition = '', extractedReason = v.visit_report || '';
             const reportMatch = extractedReason.match(/^\[Person Met:\s*(.*?)\s*-\s*(.*?)\]\n\n([\s\S]*)$/);
-            
             if (reportMatch) {
                 extractedPerson = reportMatch[1];
                 extractedPosition = reportMatch[2];
@@ -475,13 +523,13 @@ async function loadVisitsFromDB() {
                 id: v.id,
                 outlet: v.name_of_outlet || v.customer_id || '',
                 area: v.team || '',
-                person: extractedPerson,      
-                position: extractedPosition,  
+                person: extractedPerson,
+                position: extractedPosition,
                 date: v.date_visit || '',
-                reason: extractedReason,      
+                reason: extractedReason,
                 result: v.visit_result || '',
                 photos: parsedPhotos,
-                creatorName: v.bde || 'Unknown BDE', 
+                creatorName: v.bde || 'Unknown BDE',
                 creatorEmail: '',
                 creatorPosition: '',
                 is_deleted: v.is_deleted === true,
@@ -536,39 +584,42 @@ function renderPagination() {
 }
 
 function setupRealtime() {
-    if (!AppState.supabaseClient || AppState.realtimeChannel) return;
-    AppState.realtimeChannel = AppState.supabaseClient
-        .channel('app-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'visitation' }, () => loadVisitsFromDB())
-        .subscribe();
+    if (AppState.realtimeChannel) return;
+    try {
+        // ใช้ Supabase JS SDK realtime ถ้ามี ไม่ก็ polling แทน
+        if (typeof window.supabase !== 'undefined') {
+            const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+            AppState.realtimeChannel = client
+                .channel('app-realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'visitation' }, () => loadVisitsFromDB())
+                .subscribe();
+        } else {
+            // Fallback: polling ทุก 30 วินาที
+            AppState.realtimeChannel = setInterval(() => loadVisitsFromDB(), 30000);
+        }
+    } catch(e) {
+        console.warn('Realtime setup failed, using polling fallback');
+        AppState.realtimeChannel = setInterval(() => loadVisitsFromDB(), 30000);
+    }
 }
 
 async function uploadPhotosToStorage(recordId) {
     let uploadedUrls = [];
-    if (!AppState.supabaseClient) return uploadedUrls;
-    
-    const newPhotos = AppState.photos; 
-    
-    for (let i = 0; i < newPhotos.length; i++) {
-        try {
-            if (!newPhotos[i].startsWith('data:')) {
-                 uploadedUrls.push(newPhotos[i]);
-                 continue;
-            }
 
-            const res = await fetch(newPhotos[i]);
+    for (let i = 0; i < AppState.photos.length; i++) {
+        try {
+            const photo = AppState.photos[i];
+            if (!photo.startsWith('data:')) {
+                uploadedUrls.push(photo);
+                continue;
+            }
+            const res = await fetch(photo);
             const blob = await res.blob();
             const fileName = `${recordId}/photo_${Date.now()}_${i}.jpg`;
-            const { error } = await AppState.supabaseClient.storage.from('visit_photos').upload(fileName, blob, { contentType: 'image/jpeg', upsert: false });
-            if (!error) {
-                const { data: urlData } = AppState.supabaseClient.storage.from('visit_photos').getPublicUrl(fileName);
-                uploadedUrls.push(urlData.publicUrl);
-            } else {
-                console.error("Upload failed for photo", i, ":", error.message);
-                toast(`Upload failed: ${error.message}`, false);
-            }
-        } catch (e) { 
-            console.error("Upload exception for photo", i, ":", e); 
+            const publicUrl = await DB.uploadFile('visit_photos', fileName, blob);
+            uploadedUrls.push(publicUrl);
+        } catch (e) {
+            console.error("Upload failed for photo", i, ":", e);
             toast(`Upload error: ${e.message}`, false);
         }
     }
@@ -926,65 +977,50 @@ window.executeSave = async function() {
         if (AppState.photos.length === 0) { toast('Please add at least 1 photo before saving.', false); return; }
     }
 
-    if (!AppState.supabaseClient) { 
-        toast('❌ Database connection lost. Please refresh.', false); 
-        return; 
-    }
-
-    const saveBtn = document.querySelector('#save-confirm-actions .btn-primary'); 
+    const saveBtn = document.querySelector('#save-confirm-actions .btn-primary');
     const originalBtnText = saveBtn ? saveBtn.textContent : 'Confirm & Save';
-    
-    if (saveBtn) {
-        saveBtn.disabled = true; 
-        saveBtn.textContent = 'Saving...'; 
-    }
+
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
     toast('Uploading data...', true);
 
     try {
         const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString();
-        
+
         const newUploadedUrls = await uploadPhotosToStorage(id);
-        
+
         if (newUploadedUrls.length === 0 && AppState.photos.length > 0) {
             throw new Error("Failed to upload photos. Please check your connection.");
         }
 
         const payload = {
-            id: id, 
+            id: id,
             customer_id: AppState.pendingSaveData.customerId,
-            name_of_outlet: AppState.pendingSaveData.outlet, 
-            date_visit: AppState.pendingSaveData.date, 
-            visit_report: `[Person Met: ${AppState.pendingSaveData.person} - ${AppState.pendingSaveData.position}]\n\n${AppState.pendingSaveData.reason}`, 
-            visit_result: AppState.pendingSaveData.result, 
+            name_of_outlet: AppState.pendingSaveData.outlet,
+            date_visit: AppState.pendingSaveData.date,
+            visit_report: `[Person Met: ${AppState.pendingSaveData.person} - ${AppState.pendingSaveData.position}]\n\n${AppState.pendingSaveData.reason}`,
+            visit_result: AppState.pendingSaveData.result,
             visit_capture: JSON.stringify(newUploadedUrls),
-            user_id: AppState.userProfile.empId || (AppState.loggedInUser ? AppState.loggedInUser.id : ''), 
-            team: AppState.pendingSaveData.mainTeam, 
+            user_id: AppState.userProfile.empId || '',
+            team: AppState.pendingSaveData.mainTeam,
             bde: AppState.userProfile.name,
             status: 'COMPLETED'
         };
 
-        const { error } = await AppState.supabaseClient.from('visitation').insert([payload]);
-        if (error) {
-            console.error("Supabase Insert Error:", error);
-            throw new Error(error.message || "Failed to insert record into database.");
-        }
+        await DB.insert('visitation', payload);
 
         toast('✅ Visitation record saved successfully!');
         document.getElementById('save-confirm-overlay').classList.remove('open');
-        window.clearForm(); 
-        
+        window.clearForm();
+
         AppState.currentPage = 0;
-        await loadVisitsFromDB(); 
+        await loadVisitsFromDB();
         window.switchTab('list');
-        
-    } catch (err) { 
-        console.error("Save Execution Error:", err); 
-        toast('Failed to save: ' + err.message, false); 
-    } finally { 
-        if (saveBtn) {
-            saveBtn.disabled = false; 
-            saveBtn.textContent = originalBtnText; 
-        }
+
+    } catch (err) {
+        console.error("Save Execution Error:", err);
+        toast('Failed to save: ' + err.message, false);
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
     }
 }
 
@@ -1003,7 +1039,7 @@ window.switchTab = function(tab) {
     document.getElementById('tab-new').style.display = tab === 'new' ? '' : 'none';
     document.getElementById('tab-list').style.display = tab === 'list' ? '' : 'none';
 
-    if (tab === 'list') { AppState.currentPage = 0; if (AppState.supabaseClient) fetchVisitsWithSkeleton(); else window.renderList(); }
+    if (tab === 'list') { AppState.currentPage = 0; fetchVisitsWithSkeleton(); }
 }
 
 async function fetchVisitsWithSkeleton() {
@@ -1086,7 +1122,7 @@ window.openDetail = function(id) {
             <div class="detail-photos">${v.photos.map(p => `<div class="detail-photo" onclick="window.openLightbox('${p}')"><img src="${p}" style="cursor:zoom-in;"></div>`).join('')}</div>` : '';
         
         const userTeam = v.area || 'Unknown Team';
-        const userArea = v.userArea ? ` • ${v.userArea}` : ''; // 🌟 ดึงตัวแปร userArea มาแสดงผล
+        const userArea = v.userArea ? ` • ${v.userArea}` : '';
 
         const creatorHtml = `
             <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border-light);">
@@ -1338,45 +1374,30 @@ window.executeDeleteRequest = async function() {
         return;
     }
 
-    if (!AppState.supabaseClient) {
-        toast('ยังไม่ได้เชื่อมต่อฐานข้อมูล', false);
-        return;
-    }
-
     const btn = document.querySelector('#delete-confirm-overlay .btn-danger');
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Sending...';
 
     try {
-        const reqPayload = {
+        await DB.insert('delete_requests', {
             visit_id: id,
             requested_by_email: AppState.userProfile.email || '-',
             requested_by_name: AppState.userProfile.name || 'Unknown',
             reason: reason,
             status: 'pending'
-        };
-        const { error: insertError } = await AppState.supabaseClient
-            .from('delete_requests')
-            .insert([reqPayload]);
+        });
 
-        if (insertError) throw insertError;
-
-        const { error: updateError } = await AppState.supabaseClient
-            .from('visitation')
-            .update({ 
-                req_status: 'pending', 
-                delete_reason: reason,
-                is_deleted: true 
-            })
-            .eq('id', id);
-
-        if (updateError) throw updateError;
+        await DB.update('visitation', `id=eq.${encodeURIComponent(id)}`, {
+            req_status: 'pending',
+            delete_reason: reason,
+            is_deleted: true
+        });
 
         toast('✅ ส่งคำร้องขอลบข้อมูลสำเร็จ');
         window.closeDeleteRequest();
         window.closeDetail();
-        window.resetAndFetch(); 
+        window.resetAndFetch();
     } catch (err) {
         console.error(err);
         toast('เกิดข้อผิดพลาด: ' + err.message, false);
@@ -1528,3 +1549,35 @@ window.toggleDarkMode = function() {
     document.querySelectorAll('.moon-icon').forEach(el => el.style.display = isDark ? 'none' : 'block');
     document.querySelectorAll('.sun-icon').forEach(el => el.style.display = isDark ? 'block' : 'none');
 }
+
+window.playWelcomeAnimation = function(name, callback) {
+    const screen = document.getElementById('welcome-screen');
+    const text = document.getElementById('welcome-text');
+    const avatar = document.getElementById('welcome-avatar');
+    
+    // ซ่อนหน้า Login
+    document.getElementById('login-screen').style.display = 'none';
+    
+    // ดึงชื่อคำแรกมาแสดง (ตัดช่องว่าง)
+    const firstName = name ? name.split(' ')[0] : 'User';
+    text.textContent = `Hello, ${firstName}!`;
+    avatar.textContent = firstName.charAt(0).toUpperCase(); // ใช้ตัวอักษรแรก
+    
+    // รีเซ็ตคลาสและแสดงหน้า Welcome
+    screen.classList.remove('welcome-fade-out', 'animate-welcome');
+    screen.style.display = 'flex';
+    
+    // เริ่มแอนิเมชันเด้งขึ้นมา
+    setTimeout(() => {
+        screen.classList.add('animate-welcome');
+    }, 50);
+    
+    // โชว์ค้างไว้ 2 วินาที แล้ว Fade out ค่อยเข้าแอปหลัก
+    setTimeout(() => {
+        screen.classList.add('welcome-fade-out');
+        setTimeout(() => {
+            screen.style.display = 'none';
+            if(callback) callback(); // เรียกคำสั่งเข้าหน้าแอปหลัก (showMainApp)
+        }, 500); // รอให้ Fade out จบ (0.5 วินาที)
+    }, 2000); 
+};
