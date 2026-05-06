@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
     --bg-color: #F7F7F8;
@@ -24,19 +24,151 @@
 }
 
 body {
-    font-family: 'Noto Sans Thai', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--bg-color);
     min-height: 100vh;
+    min-height: 100dvh;
     color: var(--text-main);
     line-height: 1.5;
+    overscroll-behavior: none;
 }
 
-/* Layout & Tabs */
-.app {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
+/* =========================================
+   Sidebar Layout Updates
+   ========================================= */
+
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-color);
 }
+
+.app {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar {
+    width: 260px;
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    position: fixed;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    z-index: 90;
+    box-shadow: var(--shadow-sm);
+}
+
+.sidebar-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 2rem;
+    letter-spacing: -0.5px;
+}
+
+.sidebar-nav.tabs {
+    flex-direction: column;
+    background: transparent;
+    padding: 0;
+    margin-bottom: 0;
+    gap: 8px;
+}
+
+.sidebar-nav .tab {
+    text-align: left;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.sidebar-nav .tab:hover {
+    background: rgba(124, 144, 130, 0.1);
+    color: var(--primary);
+}
+
+.sidebar-nav .tab.active {
+    background: var(--primary);
+    color: #FFF;
+    box-shadow: 0 4px 12px rgba(124, 144, 130, 0.2);
+}
+
+.app-main {
+    flex: 1;
+    margin-left: 260px;
+    padding: 2rem 3rem;
+    max-width: 1200px;
+}
+
+.app-main .header {
+    margin-bottom: 1.5rem;
+}
+
+/* =========================================
+   Mobile Sidebar (Off-Canvas Drawer)
+   ========================================= */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 9998;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .app-layout {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        width: 260px;
+        height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        transform: translateX(-100%);
+        /* ซ่อนไว้ด้านซ้าย */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 9999;
+        border-right: 1px solid var(--border-light);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+        /* สไลด์ออกมาเมื่อกดปุ่ม */
+    }
+
+    .app-main {
+        margin-left: 0;
+        width: 100%;
+        padding: 1.5rem 1rem;
+    }
+
+    /* แสดงปุ่ม Hamburger บนมือถือ */
+    .hamburger-btn {
+        display: flex !important;
+    }
+}
+
+/* =========================================
+   Legacy Component Styles 
+   ========================================= */
 
 .header {
     display: flex;
@@ -45,7 +177,7 @@ body {
     margin-bottom: 2rem;
 }
 
-.header h1 {
+.header h2 {
     font-size: 22px;
     font-weight: 600;
     letter-spacing: -0.5px;
@@ -60,38 +192,6 @@ body {
     border: 1px solid var(--border-light);
 }
 
-.tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 1.5rem;
-    background: var(--border-light);
-    padding: 6px;
-    border-radius: var(--radius-md);
-}
-
-.tab {
-    flex: 1;
-    padding: 10px;
-    text-align: center;
-    font-size: 14px;
-    cursor: pointer;
-    border-radius: 12px;
-    color: var(--text-muted);
-    transition: all 0.2s ease;
-}
-
-.tab:hover {
-    color: var(--text-main);
-}
-
-.tab.active {
-    background: var(--card-bg);
-    color: var(--text-main);
-    font-weight: 500;
-    box-shadow: var(--shadow-sm);
-}
-
-/* Forms & Cards */
 .card {
     background: var(--card-bg);
     border: 1px solid var(--border-light);
@@ -196,7 +296,6 @@ textarea {
     accent-color: var(--primary);
 }
 
-/* Buttons */
 .btn-primary {
     padding: 12px 24px;
     background: var(--primary);
@@ -248,7 +347,22 @@ textarea {
     margin-top: 1.5rem;
 }
 
-/* Camera Form UI */
+@media (max-width: 480px) {
+    .form-actions {
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+
+    .form-actions .btn-primary,
+    .form-actions .btn-secondary {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+        padding: 14px;
+        font-size: 15px;
+    }
+}
+
 .easy-camera-container {
     border: 1px solid var(--border-light);
     border-radius: 12px;
@@ -339,7 +453,6 @@ textarea {
     border-color: var(--danger);
 }
 
-/* Fullscreen Camera Layout */
 .camera-modal {
     display: none;
     position: fixed;
@@ -347,6 +460,7 @@ textarea {
     background: #000;
     z-index: 99999;
     flex-direction: column;
+    height: 100dvh;
 }
 
 .camera-modal.open {
@@ -369,7 +483,8 @@ textarea {
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+    padding-top: max(20px, env(safe-area-inset-top));
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
     position: absolute;
     top: 0;
     width: 100%;
@@ -385,6 +500,7 @@ textarea {
     font-size: 14px;
     cursor: pointer;
     backdrop-filter: blur(4px);
+    min-height: 40px;
 }
 
 .camera-body {
@@ -394,27 +510,29 @@ textarea {
     justify-content: center;
     overflow: hidden;
     background: #000;
+    padding-bottom: 120px;
 }
 
 #camera-view {
     width: 100%;
     height: 100%;
-    max-height: 100vh;
-    object-fit: contain;
+    object-fit: cover;
     transition: opacity 0.15s;
 }
 
 .camera-footer {
-    padding: 20px 30px;
-    background: rgba(0, 0, 0, 0.8);
+    padding: 16px 30px;
+    background: rgba(0, 0, 0, 0.85);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: env(safe-area-inset-bottom, 40px);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
     position: absolute;
     bottom: 0;
     width: 100%;
     z-index: 10;
+    min-height: 100px;
+    backdrop-filter: blur(8px);
 }
 
 .camera-recent-thumb {
@@ -539,39 +657,68 @@ textarea {
     cursor: pointer;
 }
 
-/* Other Utilities */
 .toast {
     position: fixed;
-    top: 24px;
-    right: 24px;
+    top: 20px;
+    right: 20px;
     color: #FFF;
-    padding: 12px 20px;
+    padding: 12px 18px;
     border-radius: var(--radius-sm);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     display: none;
     z-index: 999999;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    max-width: 340px;
+    min-width: 200px;
+    line-height: 1.45;
+    pointer-events: none;
+    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 480px) {
+    .toast {
+        top: auto;
+        bottom: max(20px, env(safe-area-inset-bottom));
+        right: 12px;
+        left: 12px;
+        max-width: none;
+        text-align: center;
+        border-radius: 10px;
+    }
 }
 
 .toast.show {
     display: block;
-    animation: fadein 0.3s;
+    animation: toastIn 0.25s ease forwards;
 }
 
-@keyframes fadein {
+.toast:not(.show) {
+    animation: toastOut 0.2s ease forwards;
+}
+
+@keyframes toastIn {
     from {
         opacity: 0;
-        transform: translateY(-12px);
+        transform: translateY(-10px) scale(0.97);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
-/* Lists & Detail Modals */
+@keyframes toastOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
 .visit-list {
     display: flex;
     flex-direction: column;
@@ -610,14 +757,14 @@ textarea {
 }
 
 .badge {
-    display: inline-flex; /* เปลี่ยนเป็น inline-flex เพื่อให้จัดตำแหน่งง่ายขึ้น */
+    display: inline-flex;
     align-items: center;
-    white-space: nowrap;  /* ⚠️ บรรทัดนี้สำคัญที่สุด: ห้ามข้อความตัดขึ้นบรรทัดใหม่ */
+    white-space: nowrap;
     padding: 4px 12px;
     border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
-    width: fit-content;   /* ให้กว้างตามเนื้อหาข้อความ */
+    width: fit-content;
 }
 
 .tpl-status-badge .badge {
@@ -822,6 +969,33 @@ textarea {
     .detail-grid {
         grid-template-columns: 1fr;
     }
+
+    .detail-overlay,
+    .confirm-overlay {
+        padding: 0;
+        align-items: flex-end;
+    }
+
+    .detail-box,
+    .confirm-box {
+        border-radius: 20px 20px 0 0;
+        max-height: 92dvh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0;
+        width: 100%;
+    }
+
+    #detail-overlay {
+        padding-top: 0;
+        align-items: flex-end;
+    }
+
+    .detail-close {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
 }
 
 .confirm-photo-grid {
@@ -848,7 +1022,6 @@ textarea {
     padding-top: 2.5rem;
 }
 
-/* Profile Dropdown Menu */
 .profile-menu-container {
     position: relative;
 }
@@ -882,29 +1055,59 @@ textarea {
     font-size: 24px;
 }
 
+/* =========================================
+   Top-Right Profile Dropdown (Drops Downwards)
+   ========================================= */
+
+#theme-toggle:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+.profile-trigger:hover {
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 12px rgba(124, 144, 130, 0.12) !important;
+}
+
+/* ค้นหาและแทนที่ส่วน .profile-dropdown ทั้งหมดด้วยโค้ดชุดนี้ */
+
+#theme-toggle:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+.profile-trigger:hover {
+    transform: scale(1.05);
+    /* เพิ่มความนุ่มนวลเวลาเอาเมาส์ชี้รูปกลม */
+}
+
 .profile-dropdown {
     position: absolute;
-    top: 50px;
+    top: calc(100% + 12px);
+    /* เด้งลงมาข้างล่าง */
     right: 0;
+    left: auto;
     background: var(--card-bg);
-    width: 280px;
+    width: 260px;
     border-radius: 16px;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
     border: 1px solid var(--border-light);
     display: none;
     flex-direction: column;
     overflow: hidden;
+    z-index: 100;
 }
 
 .profile-dropdown.show {
     display: flex;
-    animation: dropDownAnim 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: dropDownTopRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top right;
 }
 
-@keyframes dropDownAnim {
+@keyframes dropDownTopRight {
     from {
         opacity: 0;
-        transform: translateY(-10px) scale(0.95);
+        transform: translateY(-10px) scale(0.96);
     }
 
     to {
@@ -913,53 +1116,82 @@ textarea {
     }
 }
 
+/* ติ่งลูกศรชี้ขึ้น ปรับให้ตรงกลางรูปวงกลม */
+.profile-dropdown::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 14px;
+    /* ปรับจาก 20px เป็น 14px เพื่อให้ตรงกลางรูปกลมพอดี */
+    width: 12px;
+    height: 12px;
+    background: var(--card-bg);
+    border-left: 1px solid var(--border-light);
+    border-top: 1px solid var(--border-light);
+    transform: rotate(45deg);
+}
+
+/* สไตล์ภายใน Dropdown */
 .pd-header {
-    padding: 20px;
+    padding: 16px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    background: var(--bg-color);
+    gap: 14px;
     border-bottom: 1px solid var(--border-light);
+    background: var(--bg-color);
 }
 
 .pd-info {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
     flex: 1;
+    overflow: hidden;
 }
 
 .pd-name {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--text-main);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.pd-email {
-    font-size: 13px;
+.pd-emp-id {
+    font-size: 12px;
     color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-family: monospace;
+    margin-top: 3px;
 }
 
 .pd-body {
-    padding: 16px 20px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .pd-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: 0.15s;
+}
+
+.pd-row:hover {
+    background: rgba(124, 144, 130, 0.08);
 }
 
 .pd-label {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
     font-weight: 500;
+}
+
+.pd-row span:not(.pd-label) {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-main);
 }
 
 .pd-footer {
@@ -972,19 +1204,33 @@ textarea {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 12px;
-    background: var(--card-bg);
-    border: none;
+    gap: 8px;
+    padding: 10px;
+    background: transparent;
     color: var(--danger);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    border-radius: 10px;
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: 0.2s;
 }
 
 .btn-logout:hover {
-    background: var(--bg-color);
+    background: #FEF8F8;
+}
+
+/* Dark Mode Overrides */
+body.dark-mode .profile-dropdown {
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .pd-header {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+body.dark-mode .btn-logout:hover {
+    background: rgba(212, 138, 138, 0.12);
 }
 
 .avatar-overlay {
@@ -1038,7 +1284,6 @@ input[type="password"]::-ms-clear {
     display: none;
 }
 
-/* Skeleton Loading Animation */
 .skeleton-card {
     background: var(--card-bg);
     border: 1px solid var(--border-light);
@@ -1111,7 +1356,6 @@ input[type="password"]::-ms-clear {
     }
 }
 
-/* Pending Delete Styles */
 .visit-card-pending {
     opacity: 0.7;
     border: 1px dashed var(--danger);
@@ -1143,7 +1387,6 @@ input[type="password"]::-ms-clear {
     margin-top: 4px;
 }
 
-/* Dark Mode Variables */
 body.dark-mode {
     --bg-color: #121212;
     --card-bg: #1E1E1E;
@@ -1166,7 +1409,6 @@ body.dark-mode .skeleton-body {
     background-size: 200% 100%;
 }
 
-/* Dark Mode Overrides for Pending */
 body.dark-mode .visit-card-pending {
     background: #251B1B !important;
     border-color: #6A3A3A !important;
@@ -1183,7 +1425,6 @@ body.dark-mode .pending-warning {
     border-color: #6A3A3A;
 }
 
-/* Autofill & Login Dark Mode Overrides */
 body.dark-mode input:-webkit-autofill,
 body.dark-mode input:-webkit-autofill:hover,
 body.dark-mode input:-webkit-autofill:focus,
@@ -1202,7 +1443,6 @@ body.dark-mode input[type="date"] {
     color: var(--text-main);
 }
 
-/* Pagination */
 .pagination-wrap {
     display: flex;
     align-items: center;
@@ -1286,13 +1526,32 @@ body.dark-mode .pagination-btn-active {
     border-color: var(--primary);
 }
 
-/* ============================================================
-   FLATPICKR THEME FIXES (Light & Dark Mode)
-   ============================================================ */
 .flatpickr-calendar {
     background: var(--card-bg) !important;
     border: 1px solid var(--border-light) !important;
     box-shadow: var(--shadow-md) !important;
+    max-width: calc(100vw - 32px) !important;
+}
+
+@media (max-width: 480px) {
+    .flatpickr-calendar {
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        position: fixed !important;
+        top: 50% !important;
+        margin-top: -160px !important;
+        z-index: 99999 !important;
+        border-radius: 16px !important;
+        width: 308px !important;
+    }
+
+    .flatpickr-calendar.arrowTop:before,
+    .flatpickr-calendar.arrowTop:after,
+    .flatpickr-calendar.arrowBottom:before,
+    .flatpickr-calendar.arrowBottom:after {
+        display: none !important;
+    }
 }
 
 .flatpickr-calendar.arrowTop:before,
@@ -1343,7 +1602,6 @@ span.flatpickr-weekday {
     opacity: 0.4;
 }
 
-/* 2. บังคับไม่ให้ Input ตกลงไปบรรทัดใหม่ */
 .ts-wrapper.single .ts-control {
     display: flex;
     flex-wrap: nowrap;
@@ -1360,12 +1618,10 @@ span.flatpickr-weekday {
     opacity: 1;
 }
 
-/* 3. ⚠️ แก้ไข: ตกแต่งปุ่ม Clear (กากบาท) บังคับให้อยู่ด้านขวาเด็ดขาด */
 .ts-wrapper .clear-button {
     position: absolute !important;
     right: 12px !important;
     left: auto !important;
-    /* บังคับไม่ให้ไปโผล่ซ้าย */
     top: 50% !important;
     transform: translateY(-50%) !important;
     z-index: 20 !important;
@@ -1378,7 +1634,6 @@ span.flatpickr-weekday {
     color: var(--danger) !important;
 }
 
-/* 4. ปรับแต่ง Dark Mode สำหรับ Tom Select */
 body.dark-mode .ts-wrapper .ts-control {
     background: var(--card-bg) !important;
     border-color: var(--border-light) !important;
@@ -1399,7 +1654,6 @@ body.dark-mode .ts-dropdown .option {
 body.dark-mode .ts-dropdown .option:hover,
 body.dark-mode .ts-dropdown .option.active {
     background: rgba(140, 166, 147, 0.15) !important;
-    /* สี Hover เขียวอ่อนๆ เข้ากับธีม */
     color: var(--text-main) !important;
 }
 
@@ -1411,7 +1665,6 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
     color: var(--text-muted) !important;
 }
 
-/* แอนิเมชันสำหรับหน้า Welcome */
 .animate-welcome #welcome-text,
 .animate-welcome #welcome-sub {
     opacity: 1 !important;
@@ -1423,8 +1676,15 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
 }
 
 @keyframes popInAvatar {
-    0% { transform: scale(0.5); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .welcome-fade-out {
@@ -1432,5 +1692,8 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
 }
 
 @keyframes welcomeFadeOut {
-    to { opacity: 0; visibility: hidden; }
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
 }
