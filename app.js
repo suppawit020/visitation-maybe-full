@@ -6,11 +6,16 @@ const CONFIG = {
         PROFILE: 'outlet_profile_v1',
         SESSION: 'checklist_user_session',
         REMEMBER: 'checklist_user_remember',
-        AUTOSAVE: 'checklist_autosave_v1'
+        AUTOSAVE: 'checklist_autosave_v1',
+        LOGIN_AT: 'checklist_login_at'
     },
     SUPABASE: {
         URL: 'https://bvonujjvovziubyhqsjx.supabase.co',
         KEY: 'sb_publishable_GBw0pKHMLihSSfRTpnxuTw_e0OC1hYD'
+    },
+    SESSION_HOURS: {
+        DEFAULT: 8,
+        REMEMBER: 720
     },
     PAGE_SIZE: 5,
     MAX_PHOTOS: 10,
@@ -18,7 +23,20 @@ const CONFIG = {
 };
 
 // ============================================================
-// SUPABASE REST CLIENT (ไม่ใช้ Auth SDK — เรียก REST ตรงๆ)
+// CRYPTO UTILITIES
+// ============================================================
+async function sha256(text) {
+    const buf = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(text)
+    );
+    return Array.from(new Uint8Array(buf))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+// ============================================================
+// SUPABASE DB & STORAGE
 // ============================================================
 const DB = {
     async query(path, opts = {}) {
@@ -57,7 +75,6 @@ const DB = {
         });
     },
 
-    // Supabase Storage upload (ยังคงใช้ fetch ตรงๆ)
     async uploadFile(bucket, path, blob, contentType = 'image/jpeg') {
         const res = await fetch(`${CONFIG.SUPABASE.URL}/storage/v1/object/${bucket}/${path}`, {
             method: 'POST',
@@ -84,7 +101,7 @@ const TEAM_STRUCTURE = {
 let AppState = {
     cameraStream: null,
     isCameraLoading: false,
-    currentFacingMode: 'environment', 
+    currentFacingMode: 'environment',
     visits: [],
     photos: [],
     userProfile: { empId: '', name: '', email: '', team: '', area: '', contact: '', avatar: '' },
@@ -113,9 +130,22 @@ window.addEventListener('DOMContentLoaded', async () => {
 async function checkSession() {
     try {
         const rawProfile = localStorage.getItem(CONFIG.KEYS.PROFILE);
-        const hasSession = localStorage.getItem(CONFIG.KEYS.REMEMBER) || sessionStorage.getItem(CONFIG.KEYS.SESSION);
+        const isRemember = !!localStorage.getItem(CONFIG.KEYS.REMEMBER);
+        const hasSession = isRemember || !!sessionStorage.getItem(CONFIG.KEYS.SESSION);
 
         if (!rawProfile || !hasSession) return false;
+        const loginAt = parseInt(localStorage.getItem(CONFIG.KEYS.LOGIN_AT) || '0', 10);
+        if (loginAt) {
+            const maxHours = isRemember
+                ? CONFIG.SESSION_HOURS.REMEMBER
+                : CONFIG.SESSION_HOURS.DEFAULT;
+            const elapsedHours = (Date.now() - loginAt) / 3600000;
+            if (elapsedHours > maxHours) {
+                _clearSessionStorage();
+                showSessionExpiredBanner();
+                return false;
+            }
+        }
 
         const localProfile = JSON.parse(rawProfile);
         if (!localProfile.empId && !localProfile.name) return false;
@@ -139,6 +169,21 @@ async function checkSession() {
     }
 }
 
+function _clearSessionStorage() {
+    sessionStorage.removeItem(CONFIG.KEYS.SESSION);
+    localStorage.removeItem(CONFIG.KEYS.REMEMBER);
+    localStorage.removeItem(CONFIG.KEYS.PROFILE);
+    localStorage.removeItem(CONFIG.KEYS.LOGIN_AT);
+}
+
+function showSessionExpiredBanner() {
+    const errEl = document.getElementById('login-error');
+    if (errEl) {
+        errEl.textContent = 'Your session has expired. Please sign in again.';
+        errEl.style.display = 'block';
+    }
+}
+
 function initApp() {
     AppState.fpDate = flatpickr("#f-date", {
         altInput: true, altFormat: "d M Y", dateFormat: "Y-m-d", defaultDate: "today", minDate: "today", maxDate: "today"
@@ -150,21 +195,21 @@ function initApp() {
 
     AppState.fpFilterDate = flatpickr("#fl-date-wrap", {
         wrap: true, altInput: true, altFormat: "d M Y", dateFormat: "Y-m-d",
-        onChange: function() { resetAndFetch(); }
+        onChange: function () { resetAndFetch(); }
     });
 
     bindPositionToggle();
     prefillAndLockTeamFields();
 
     document.getElementById('profile-menu-wrap').style.display = 'block';
-    
+
     const localProfile = JSON.parse(localStorage.getItem(CONFIG.KEYS.PROFILE)) || AppState.userProfile;
     AppState.userProfile.avatar = localProfile.avatar || '';
 
     const initial = (AppState.userProfile.name || 'U').charAt(0).toUpperCase();
     document.getElementById('avatar-small-text').textContent = initial;
     document.getElementById('avatar-text').textContent = initial;
-    
+
     document.getElementById('pd-name').textContent = AppState.userProfile.name;
     document.getElementById('pd-emp-id').textContent = AppState.userProfile.empId || 'NO ID';
     document.getElementById('pd-email').textContent = AppState.userProfile.email;
@@ -178,7 +223,7 @@ function initApp() {
     const cbNext = document.getElementById('cb-next-visit');
     if (cbNext && !cbNext._bound) {
         cbNext._bound = true;
-        cbNext.addEventListener('change', function() {
+        cbNext.addEventListener('change', function () {
             document.getElementById('next-visit-wrap').style.display = this.checked ? 'block' : 'none';
             if (this.checked && AppState.fpNextDate) AppState.fpNextDate.setDate(today());
         });
@@ -264,20 +309,20 @@ async function loadCustomerDropdown() {
             labelField: 'text',
             searchField: ['text', 'searchText'],
             sortField: { field: 'value', direction: 'asc' },
-            placeholder: options.length > 0 ? '-- Select outlet --' : 'ไม่พบรายชื่อร้านค้า',
+            placeholder: options.length > 0 ? '-- Select outlet --' : 'No outlets found',
             allowEmptyOption: true,
             maxOptions: 500,
             maxItems: 1,
             plugins: ['clear_button'],
             render: {
-                option: function(item, escape) {
+                option: function (item, escape) {
                     return `<div><span style="color:var(--text-muted);font-size:11px;margin-right:6px;">${escape(item.value)}</span>${escape(item.text)}</div>`;
                 },
-                item: function(item, escape) {
+                item: function (item, escape) {
                     return `<div>${escape(item.text)}</div>`;
                 }
             },
-            onChange: function(value) {
+            onChange: function (value) {
                 const opt = options.find(o => o.value === value);
                 document.getElementById('f-outlet-name').value = opt ? opt.outletName : '';
                 saveAutoSaveData();
@@ -289,21 +334,23 @@ async function loadCustomerDropdown() {
     }
 }
 
-window.handleFilterPosChange = function() {
+window.handleFilterPosChange = function () {
     const pos = document.getElementById('fl-pos').value;
     const otherInput = document.getElementById('fl-pos-other');
     if (pos === '__other__') {
-        otherInput.style.display = 'block'; otherInput.focus();
+        otherInput.style.display = 'block';
+        otherInput.focus();
     } else {
-        otherInput.style.display = 'none'; otherInput.value = '';
+        otherInput.style.display = 'none';
+        otherInput.value = '';
+        resetAndFetch();
     }
-    resetAndFetch();
 }
 
 // ============================================================
 // AUTHENTICATION MODULE
 // ============================================================
-window.doUserLogin = async function() {
+window.doUserLogin = async function () {
     const usernameInput = document.getElementById('login-username').value.trim();
     const pass = document.getElementById('login-pass').value;
     const remember = document.getElementById('login-remember').checked;
@@ -320,7 +367,6 @@ window.doUserLogin = async function() {
     if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
 
     try {
-        // query user_information พร้อม join users เพื่อดึง password_hash
         const data = await DB.select(
             'user_information',
             `select=*,users(id,password_hash,is_active)&username=eq.${encodeURIComponent(usernameInput)}&limit=1`
@@ -333,17 +379,14 @@ window.doUserLogin = async function() {
             errEl.style.display = 'block';
             return;
         }
-
-        // ตรวจสอบ is_active
         if (info.users && info.users.is_active === false) {
             errEl.textContent = 'This account has been disabled. Please contact admin.';
             errEl.style.display = 'block';
             return;
         }
-
-        // เทียบ password กับ password_hash ใน users table
         const storedHash = info.users?.password_hash || '';
-        const isValid = storedHash === pass;
+        const inputHash = await sha256(pass);
+        const isValid = storedHash === inputHash;
         if (!isValid) {
             errEl.textContent = 'Invalid username or password.';
             errEl.style.display = 'block';
@@ -358,21 +401,21 @@ window.doUserLogin = async function() {
             subTeam: info.sub_team,
             area: info.level,
             contact: info.contact || '-',
-            avatar: ''
+            avatar: info.avatar || ''
         };
 
         const profilePayload = JSON.stringify(AppState.userProfile);
         localStorage.setItem(CONFIG.KEYS.PROFILE, profilePayload);
+        localStorage.setItem(CONFIG.KEYS.LOGIN_AT, Date.now().toString());
 
         if (remember) {
             localStorage.setItem(CONFIG.KEYS.REMEMBER, 'true');
+            localStorage.removeItem(CONFIG.KEYS.SESSION);
         } else {
             localStorage.removeItem(CONFIG.KEYS.REMEMBER);
             sessionStorage.setItem(CONFIG.KEYS.SESSION, 'true');
         }
-
-        // เล่น Animation ก่อน แล้วค่อยเข้า showMainApp
-        playWelcomeAnimation(AppState.userProfile.name, showMainApp); 
+        playWelcomeAnimation(AppState.userProfile.name, showMainApp);
     } catch (e) {
         errEl.textContent = 'Login failed: ' + e.message;
         errEl.style.display = 'block';
@@ -381,14 +424,10 @@ window.doUserLogin = async function() {
     }
 }
 
-window.doUserLogout = function() {
-    sessionStorage.removeItem(CONFIG.KEYS.SESSION);
-    localStorage.removeItem(CONFIG.KEYS.REMEMBER);
-    localStorage.removeItem(CONFIG.KEYS.PROFILE);
-
-    // ยกเลิก Realtime channel ถ้ามี
+window.doUserLogout = function () {
+    _clearSessionStorage();
     if (AppState.realtimeChannel) {
-        try { AppState.realtimeChannel.unsubscribe(); } catch(e) {}
+        try { AppState.realtimeChannel.unsubscribe(); } catch (e) { }
         AppState.realtimeChannel = null;
     }
 
@@ -413,10 +452,10 @@ window.doUserLogout = function() {
     document.getElementById('eye-icon').innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
 }
 
-window.togglePasswordVisibility = function() {
+window.togglePasswordVisibility = function () {
     const passInput = document.getElementById('login-pass');
     const eyeIcon = document.getElementById('eye-icon');
-    
+
     if (passInput.type === 'password') {
         passInput.type = 'text';
         eyeIcon.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`;
@@ -430,13 +469,13 @@ window.togglePasswordVisibility = function() {
 // DATABASE & STORAGE OPERATIONS
 // ============================================================
 
-window.resetAndFetch = function() {
+window.resetAndFetch = function () {
     AppState.currentPage = 0;
     fetchVisitsWithSkeleton();
 }
 
 let searchTimeout;
-window.debounceSearch = function() {
+window.debounceSearch = function () {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => { window.resetAndFetch(); }, 500);
 }
@@ -454,8 +493,10 @@ async function loadVisitsFromDB() {
         const filterArea = document.getElementById('fl-area')?.value || '';
         const filterDate = document.getElementById('fl-date')?.value || '';
         const filterSearch = document.getElementById('fl-search')?.value.toLowerCase().trim() || '';
-
-        // สร้าง base filter string
+        const filterPosRaw = document.getElementById('fl-pos')?.value || '';
+        const filterPos = filterPosRaw === '__other__'
+            ? (document.getElementById('fl-pos-other')?.value.trim() || '')
+            : filterPosRaw;
         let filters = `or=(req_status.is.null,req_status.neq.approved)`;
 
         if (!isAdmin) {
@@ -473,8 +514,7 @@ async function loadVisitsFromDB() {
         if (filterArea) filters += `&team=eq.${encodeURIComponent(filterArea)}`;
         if (filterDate) filters += `&date_visit=eq.${encodeURIComponent(filterDate)}`;
         if (filterSearch) filters += `&or=(name_of_outlet.ilike.*${encodeURIComponent(filterSearch)}*,visit_report.ilike.*${encodeURIComponent(filterSearch)}*)`;
-
-        // ดึงข้อมูลพร้อม count ในคราวเดียว
+        if (filterPos) filters += `&visit_report=ilike.*- ${encodeURIComponent(filterPos)}]*`;
         const countRes = await fetch(
             `${CONFIG.SUPABASE.URL}/rest/v1/visitation?${filters}&select=id`,
             {
@@ -493,8 +533,6 @@ async function loadVisitsFromDB() {
             `visitation?${filters}&select=*&order=date_visit.desc&limit=${CONFIG.PAGE_SIZE}&offset=${rangeStart}`,
             { headers: { 'Range': `${rangeStart}-${rangeEnd}`, 'Range-Unit': 'items' } }
         );
-
-        // ดึง sub_team ของ users ที่เกี่ยวข้อง
         const userIds = [...new Set((visitsData || []).map(v => v.user_id).filter(Boolean))];
         let usersMap = {};
         if (userIds.length > 0) {
@@ -507,7 +545,7 @@ async function loadVisitsFromDB() {
 
         const formatted = (visitsData || []).map(v => {
             let parsedPhotos = [];
-            try { parsedPhotos = v.visit_capture ? JSON.parse(v.visit_capture) : []; } catch(e) {}
+            try { parsedPhotos = v.visit_capture ? JSON.parse(v.visit_capture) : []; } catch (e) { }
 
             let extractedPerson = '', extractedPosition = '', extractedReason = v.visit_report || '';
             const reportMatch = extractedReason.match(/^\[Person Met:\s*(.*?)\s*-\s*(.*?)\]\n\n([\s\S]*)$/);
@@ -544,7 +582,7 @@ async function loadVisitsFromDB() {
     } catch (e) { console.error(e); }
 }
 
-window.goToPage = function(page) {
+window.goToPage = function (page) {
     if (page < 0 || page >= AppState.totalPages) return;
     AppState.currentPage = page;
     fetchVisitsWithSkeleton();
@@ -586,7 +624,6 @@ function renderPagination() {
 function setupRealtime() {
     if (AppState.realtimeChannel) return;
     try {
-        // ใช้ Supabase JS SDK realtime ถ้ามี ไม่ก็ polling แทน
         if (typeof window.supabase !== 'undefined') {
             const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
             AppState.realtimeChannel = client
@@ -594,10 +631,9 @@ function setupRealtime() {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'visitation' }, () => loadVisitsFromDB())
                 .subscribe();
         } else {
-            // Fallback: polling ทุก 30 วินาที
             AppState.realtimeChannel = setInterval(() => loadVisitsFromDB(), 30000);
         }
-    } catch(e) {
+    } catch (e) {
         console.warn('Realtime setup failed, using polling fallback');
         AppState.realtimeChannel = setInterval(() => loadVisitsFromDB(), 30000);
     }
@@ -627,9 +663,44 @@ async function uploadPhotosToStorage(recordId) {
 }
 
 // ============================================================
+// WATERMARK MODULE
+// ============================================================
+function applyWatermark(canvas, ctx) {
+    const outletInput = document.getElementById('f-outlet-name');
+    const outletName = (outletInput && outletInput.value) ? outletInput.value : 'No Outlet Selected';
+    const empName = AppState.userProfile.name || 'Unknown BDE';
+
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    const fontSize = Math.max(12, Math.floor(canvas.width / 70));
+    ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+
+    const padding = 12;
+    const x = canvas.width - padding;
+    const y = canvas.height - padding;
+    const lineH = fontSize * 1.4;
+
+    ctx.fillStyle = 'white';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+
+    ctx.fillText(`Date: ${dateStr}`, x, y);
+    ctx.fillText(`By: ${empName}`, x, y - lineH);
+    ctx.fillText(`Outlet: ${outletName}`, x, y - (lineH * 2));
+
+    ctx.shadowColor = 'transparent';
+}
+
+// ============================================================
 // CAMERA & MEDIA MODULE
 // ============================================================
-window.toggleCamera = async function() {
+window.toggleCamera = async function () {
     if (AppState.isCameraLoading) return;
     AppState.currentFacingMode = AppState.currentFacingMode === 'environment' ? 'user' : 'environment';
     if (AppState.cameraStream) {
@@ -639,21 +710,21 @@ window.toggleCamera = async function() {
     await window.startCamera();
 }
 
-window.startCamera = async function() {
+window.startCamera = async function () {
     if (AppState.isCameraLoading) return;
-    AppState.isCameraLoading = true; 
+    AppState.isCameraLoading = true;
     const btn = document.getElementById('btn-start-cam');
     if (btn) btn.disabled = true;
-    
+
     const video = document.getElementById('camera-view');
     const modal = document.getElementById('camera-modal');
     updateMiniGalleryThumb();
 
     try {
         if (AppState.cameraStream) AppState.cameraStream.getTracks().forEach(t => t.stop());
-        AppState.cameraStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: { ideal: AppState.currentFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, 
-            audio: false 
+        AppState.cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: AppState.currentFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
         });
         video.srcObject = AppState.cameraStream;
         video.style.transform = AppState.currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
@@ -673,35 +744,37 @@ window.startCamera = async function() {
     }
 }
 
-window.stopCamera = function() {
+window.stopCamera = function () {
     if (AppState.cameraStream) { AppState.cameraStream.getTracks().forEach(t => t.stop()); AppState.cameraStream = null; }
     document.getElementById('camera-modal').classList.remove('open');
-    closeCameraGallery(); 
+    closeCameraGallery();
 }
 
-window.capturePhoto = function() {
+window.capturePhoto = function () {
     if (AppState.photos.length >= CONFIG.MAX_PHOTOS) { toast(`Max ${CONFIG.MAX_PHOTOS} photos allowed.`, false); return; }
     const video = document.getElementById('camera-view');
     const canvas = document.getElementById('camera-canvas');
     const ctx = canvas.getContext('2d');
-    
+
     canvas.width = video.videoWidth; canvas.height = video.videoHeight;
     if (AppState.currentFacingMode === 'user') { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     if (AppState.currentFacingMode === 'user') { ctx.setTransform(1, 0, 0, 1, 0, 0); }
 
+    applyWatermark(canvas, ctx);
+
     AppState.photos.push(canvas.toDataURL('image/jpeg', 0.7));
     video.style.opacity = '0.3';
     setTimeout(() => { video.style.opacity = '1'; }, 150);
 
-    updateModalCounter(); renderPreviews(); updateMiniGalleryThumb(); saveAutoSaveData(); 
+    updateModalCounter(); renderPreviews(); updateMiniGalleryThumb(); saveAutoSaveData();
     if (document.getElementById('m-photo-grid')) renderModalPhotos();
     if (AppState.photos.length >= CONFIG.MAX_PHOTOS) { toast(`Reached ${CONFIG.MAX_PHOTOS} photos maximum.`); setTimeout(window.stopCamera, 500); }
 }
 
-window.selectFromLibrary = function() {
+window.selectFromLibrary = function () {
     if (!CONFIG.ALLOW_LIBRARY_UPLOAD) { toast('Photo capture only.', false); return; }
-    document.getElementById('library-input').click(); 
+    document.getElementById('library-input').click();
 }
 
 function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.7) {
@@ -714,11 +787,14 @@ function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.7) {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 let width = img.width; let height = img.height;
-                if (width > height) { if (width > maxWidth) { height = Math.round((height *= maxWidth / width)); width = maxWidth; } } 
+                if (width > height) { if (width > maxWidth) { height = Math.round((height *= maxWidth / width)); width = maxWidth; } }
                 else { if (height > maxHeight) { width = Math.round((width *= maxHeight / height)); height = maxHeight; } }
                 canvas.width = width; canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
+
+                applyWatermark(canvas, ctx);
+
                 resolve(canvas.toDataURL('image/jpeg', quality));
             };
             img.onerror = error => reject(error);
@@ -727,20 +803,20 @@ function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.7) {
     });
 }
 
-window.handleLibrarySelection = async function(input) {
+window.handleLibrarySelection = async function (input) {
     if (!input.files || !input.files.length) return;
     const availableSlots = CONFIG.MAX_PHOTOS - AppState.photos.length;
     if (availableSlots <= 0) { toast(`Photo limit reached.`, false); input.value = ''; return; }
 
     const filesToUpload = Array.from(input.files).slice(0, availableSlots);
     toast('Processing images...', true);
-    
+
     for (const file of filesToUpload) {
         if (!file.type.startsWith('image/')) continue;
         try { AppState.photos.push(await compressImage(file, 1280, 1280, 0.7)); } catch (e) { console.error("image processing failed:", e); }
     }
     input.value = '';
-    renderPreviews(); updateModalCounter(); saveAutoSaveData(); 
+    renderPreviews(); updateModalCounter(); saveAutoSaveData();
     if (document.getElementById('m-photo-grid')) renderModalPhotos();
 }
 
@@ -772,7 +848,7 @@ async function saveAutoSaveData() {
         result: document.getElementById('f-result').value,
         followups: Array.from(document.querySelectorAll('.f-followup')).map(cb => cb.checked),
         nextDate: document.getElementById('f-next-date').value,
-        photos: AppState.photos 
+        photos: AppState.photos
     };
     try { await localforage.setItem(CONFIG.KEYS.AUTOSAVE, data); } catch (e) { console.error("Autosave failed:", e); }
 }
@@ -797,7 +873,7 @@ async function loadAutoSaveData() {
         populateField('f-pos-other', data.posOther);
         populateField('f-reason', data.reason);
         populateField('f-result', data.result);
-        
+
         if (data.date && AppState.fpDate) { AppState.fpDate.setDate(data.date); hasData = true; }
         if (data.nextDate && AppState.fpNextDate) { AppState.fpNextDate.setDate(data.nextDate); }
 
@@ -819,12 +895,12 @@ async function loadAutoSaveData() {
             AppState.photos = data.photos;
             renderPreviews(); updateModalCounter(); updateMiniGalleryThumb(); hasData = true;
         }
-        
+
         if (hasData) { toast('Draft restored automatically.', true); }
     } catch (e) { console.error("Failed to load autosave", e); }
 }
 
-window.clearForm = function() {
+window.clearForm = function () {
     AppState.isClearingForm = true;
     if (AppState.tomSelectCustomer) AppState.tomSelectCustomer.clear(true);
     document.getElementById('f-outlet-name').value = '';
@@ -837,7 +913,7 @@ window.clearForm = function() {
     if (AppState.fpNextDate) AppState.fpNextDate.clear();
     document.querySelectorAll('.f-followup').forEach(cb => cb.checked = false);
     document.getElementById('next-visit-wrap').style.display = 'none';
-    
+
     AppState.photos = [];
     renderPreviews(); window.stopCamera();
     localforage.removeItem(CONFIG.KEYS.AUTOSAVE).finally(() => {
@@ -848,11 +924,11 @@ window.clearForm = function() {
 // ============================================================
 // SAVE & VALIDATION MODULE
 // ============================================================
-window.triggerSaveConfirm = function() {
+window.triggerSaveConfirm = function () {
     const customerSelect = document.getElementById('f-customer');
-    if (!customerSelect.value) { 
+    if (!customerSelect.value) {
         toast('Please select a Customer / Outlet.', false);
-        
+
         if (AppState.tomSelectCustomer && AppState.tomSelectCustomer.control) {
             const tsControl = AppState.tomSelectCustomer.control;
             tsControl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -860,12 +936,12 @@ window.triggerSaveConfirm = function() {
             tsControl.classList.add('error-highlight');
             setTimeout(() => tsControl.classList.remove('error-highlight'), 2500);
         } else {
-            customerSelect.focus(); 
+            customerSelect.focus();
         }
-        return; 
+        return;
     }
 
-    const requiredFields = [    
+    const requiredFields = [
         { id: 'f-main-team', name: 'Team' },
         { id: 'f-sub-team', name: 'Sub-Team/Area' },
         { id: 'f-person', name: 'Person You Met' },
@@ -882,7 +958,7 @@ window.triggerSaveConfirm = function() {
         if (!el || !el.value.trim()) {
             toast(`Please fill in: ${field.name}`, false);
             if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); 
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus();
                 el.classList.add('error-highlight'); setTimeout(() => el.classList.remove('error-highlight'), 2500);
             }
             return;
@@ -900,7 +976,7 @@ window.triggerSaveConfirm = function() {
             }
         } else if (cb.checked) followUps.push(cb.value);
     });
-    
+
     const fNext = document.getElementById('cb-next-visit').checked;
     const fNextDate = document.getElementById('f-next-date').value;
     const resultEl = document.getElementById('f-result');
@@ -923,18 +999,18 @@ window.triggerSaveConfirm = function() {
         return;
     }
 
-    const finalResultText = result + (followUps.length > 0 && result ? '\n\n' : '') + 
-                           (followUps.length > 0 ? '[ Follow-up Actions ]\n- ' + followUps.join('\n- ') : '');
+    const finalResultText = result + (followUps.length > 0 && result ? '\n\n' : '') +
+        (followUps.length > 0 ? '[ Follow-up Actions ]\n- ' + followUps.join('\n- ') : '');
 
-    AppState.pendingSaveData = { 
-        customerId: customerSelect.value, 
+    AppState.pendingSaveData = {
+        customerId: customerSelect.value,
         outlet: document.getElementById('f-outlet-name').value,
-        mainTeam: document.getElementById('f-main-team').value, 
-        subTeam: document.getElementById('f-sub-team').value, 
-        person: document.getElementById('f-person').value.trim(), 
-        position: getPosition(), 
-        date: document.getElementById('f-date').value, 
-        reason: document.getElementById('f-reason').value.trim(), 
+        mainTeam: document.getElementById('f-main-team').value,
+        subTeam: document.getElementById('f-sub-team').value,
+        person: document.getElementById('f-person').value.trim(),
+        position: getPosition(),
+        date: document.getElementById('f-date').value,
+        reason: document.getElementById('f-reason').value.trim(),
         result: finalResultText,
         rawResult: result,
         rawFollowUps: { fQuotation, fCall, fNext, fNextDate }
@@ -944,7 +1020,7 @@ window.triggerSaveConfirm = function() {
     document.getElementById('save-confirm-overlay').classList.add('open');
 }
 
-window.executeSave = async function() {
+window.executeSave = async function () {
     if (!AppState.pendingSaveData) return;
 
     if (document.getElementById('save-confirm-overlay').getAttribute('data-mode') === 'edit') {
@@ -957,11 +1033,11 @@ window.executeSave = async function() {
             mFollowUps.push(nd ? `Schedule Next Visit: ${fmtDate(nd)}` : 'Schedule Next Visit');
         }
 
-        const mFinalResultText = mResult + (mFollowUps.length > 0 && mResult ? '\n\n' : '') + 
-                                (mFollowUps.length > 0 ? '[ Follow-up Actions ]\n- ' + mFollowUps.join('\n- ') : '');
-        
+        const mFinalResultText = mResult + (mFollowUps.length > 0 && mResult ? '\n\n' : '') +
+            (mFollowUps.length > 0 ? '[ Follow-up Actions ]\n- ' + mFollowUps.join('\n- ') : '');
+
         const posSel = document.getElementById('m-position-sel').value;
-        
+
         AppState.pendingSaveData.mainTeam = document.getElementById('m-main-team').value;
         AppState.pendingSaveData.subTeam = document.getElementById('m-sub-team').value;
         AppState.pendingSaveData.date = document.getElementById('m-date').value;
@@ -1008,7 +1084,7 @@ window.executeSave = async function() {
 
         await DB.insert('visitation', payload);
 
-        toast('✅ Visitation record saved successfully!');
+        toast('Visitation record saved successfully!');
         document.getElementById('save-confirm-overlay').classList.remove('open');
         window.clearForm();
 
@@ -1033,25 +1109,31 @@ function showMainApp() {
     initApp();
 }
 
-window.switchTab = function(tab) {
+window.switchTab = function (tab) {
     if (tab !== 'new') window.stopCamera();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (tab === 'new' && i === 0) || (tab === 'list' && i === 1)));
     document.getElementById('tab-new').style.display = tab === 'new' ? '' : 'none';
     document.getElementById('tab-list').style.display = tab === 'list' ? '' : 'none';
 
+    // อัปเดต Page Title ด้านขวาให้สอดคล้องกับเมนูที่เลือก
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) {
+        pageTitle.textContent = tab === 'new' ? 'New Visit' : 'All Visits';
+    }
+
     if (tab === 'list') { AppState.currentPage = 0; fetchVisitsWithSkeleton(); }
 }
 
 async function fetchVisitsWithSkeleton() {
-    document.getElementById('visit-list').innerHTML = ''; 
+    document.getElementById('visit-list').innerHTML = '';
     document.getElementById('pagination-container').innerHTML = '';
-    document.getElementById('visit-list-loading').style.display = 'block'; 
+    document.getElementById('visit-list-loading').style.display = 'block';
     await loadVisitsFromDB();
     document.getElementById('visit-list-loading').style.display = 'none';
     renderList(); renderPagination();
 }
 
-window.renderList = function() {
+window.renderList = function () {
     const area = document.getElementById('fl-area').value;
     let pos = document.getElementById('fl-pos').value;
     const q = document.getElementById('fl-search').value.toLowerCase();
@@ -1072,20 +1154,20 @@ window.renderList = function() {
     const el = document.getElementById('visit-list');
     if (!filtered.length) { el.innerHTML = `<div class="empty-state"><p>No records found.</p></div>`; return; }
 
-    el.innerHTML = ''; 
+    el.innerHTML = '';
     const template = document.getElementById('visit-card-template');
 
     filtered.forEach(v => {
         const isPending = v.req_status === 'pending';
         const clone = template.content.cloneNode(true);
         const card = clone.querySelector('.visit-card');
-        
+
         if (isPending) card.classList.add('visit-card-pending');
         card.onclick = () => window.openDetail(v.id);
 
         clone.querySelector('.tpl-outlet').textContent = v.outlet;
         clone.querySelector('.tpl-area').textContent = v.area;
-        
+
         const statusBadge = clone.querySelector('.tpl-status-badge');
         if (isPending) statusBadge.innerHTML = `<span class="badge badge-pending">Pending Delete</span>`;
 
@@ -1102,11 +1184,11 @@ window.renderList = function() {
     });
 }
 
-window.openDetail = function(id) {
+window.openDetail = function (id) {
     try {
-        const v = AppState.visits.find(x => String(x.id) === String(id)); 
+        const v = AppState.visits.find(x => String(x.id) === String(id));
         if (!v) { alert("Error: Data not found."); return; }
-        
+
         const isPending = v.req_status === 'pending';
         const visitInfo = [['Met With', `${v.person} (${v.position})`], ['Reason for Visit', v.reason], ['Result & Actions', v.result]];
 
@@ -1120,7 +1202,7 @@ window.openDetail = function(id) {
             <div style="border-top:1px dashed var(--border-light); margin:24px 0 16px 0;"></div>
             <div class="detail-label" style="margin-bottom:12px;">ATTACHED PHOTOS (${v.photos.length})</div>
             <div class="detail-photos">${v.photos.map(p => `<div class="detail-photo" onclick="window.openLightbox('${p}')"><img src="${p}" style="cursor:zoom-in;"></div>`).join('')}</div>` : '';
-        
+
         const userTeam = v.area || 'Unknown Team';
         const userArea = v.userArea ? ` • ${v.userArea}` : '';
 
@@ -1147,9 +1229,9 @@ window.openDetail = function(id) {
                     Request Delete
                 </button>
             </div>` : '';
-        
+
         document.getElementById('detail-content').innerHTML = `
-            ${isPending ? `<div class="pending-warning" style="margin-bottom: 24px;"><strong>⚠️ Pending deletion review.</strong><div>Reason: ${esc(v.delete_reason)}</div></div>` : ''}
+            ${isPending ? `<div class="pending-warning" style="margin-bottom: 24px;"><strong>Pending deletion review.</strong><div>Reason: ${esc(v.delete_reason)}</div></div>` : ''}
             
             <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-light);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1171,12 +1253,12 @@ window.openDetail = function(id) {
 
             <div style="${isPending ? 'opacity:0.6;' : ''}">${renderFields(visitInfo)}</div>
             ${photosHtml}${creatorHtml}${deleteBtnHtml}`;
-            
+
         document.getElementById('detail-overlay').classList.add('open');
     } catch (e) { console.error(e); }
 }
 
-window.renderConfirmModal = function() {
+window.renderConfirmModal = function () {
     const photosHtml = `<div class="confirm-photo-grid">${AppState.photos.map(p => `<img src="${p}" onclick="window.openLightbox('${p}')" style="cursor:zoom-in;">`).join('')}</div>`;
 
     document.getElementById('save-confirm-text').innerHTML = `
@@ -1202,11 +1284,11 @@ window.renderConfirmModal = function() {
             </div>
             <div style="margin-bottom: 16px;">
                 <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Reason for Visit</div>
-                <div style="font-size: 14px; line-height: 1.5; background: var(--card-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-light);">${esc(AppState.pendingSaveData.reason).replace(/\n/g,'<br>')}</div>
+                <div style="font-size: 14px; line-height: 1.5; background: var(--card-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-light);">${esc(AppState.pendingSaveData.reason).replace(/\n/g, '<br>')}</div>
             </div>
             <div style="margin-bottom: 16px;">
                 <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Result & Actions</div>
-                <div style="font-size: 14px; line-height: 1.5; background: var(--card-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-light);">${esc(AppState.pendingSaveData.result).replace(/\n/g,'<br>')}</div>
+                <div style="font-size: 14px; line-height: 1.5; background: var(--card-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-light);">${esc(AppState.pendingSaveData.result).replace(/\n/g, '<br>')}</div>
             </div>
             <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-light);">
                 <div style="font-size: 12px; font-weight: 500;">Attached Photos: <span style="color: var(--primary); font-weight: 600;">${AppState.photos.length}</span></div>
@@ -1221,11 +1303,11 @@ window.renderConfirmModal = function() {
     document.getElementById('save-confirm-overlay').setAttribute('data-mode', 'static');
 }
 
-window.enableModalEdit = function() {
+window.enableModalEdit = function () {
     const positions = ['CEO', 'CFO', 'OWNER', 'BARTENDER', 'F&B MANAGER', 'MANAGER'];
     const isOtherPos = AppState.pendingSaveData.position && !positions.includes(AppState.pendingSaveData.position);
     const posOptions = positions.map(p => `<option value="${p}" ${p === AppState.pendingSaveData.position ? 'selected' : ''}>${p}</option>`).join('');
-    
+
     const f = AppState.pendingSaveData.rawFollowUps || {};
 
     document.getElementById('save-confirm-text').innerHTML = `
@@ -1322,7 +1404,7 @@ window.enableModalEdit = function() {
     flatpickr("#m-next-date", { altInput: true, altFormat: "d M Y", dateFormat: "Y-m-d", minDate: "today" });
 }
 
-window.updateModalSubTeam = function(mainTeam) {
+window.updateModalSubTeam = function (mainTeam) {
     const subSelect = document.getElementById('m-sub-team');
     subSelect.innerHTML = '';
     if (TEAM_STRUCTURE[mainTeam]) {
@@ -1341,35 +1423,35 @@ function renderModalPhotos() {
     if (AppState.photos.length > 0) {
         grid.innerHTML = AppState.photos.map((p, i) => `<div class="photo-thumb"><img src="${p}" onclick="window.openLightbox('${p}')"><button type="button" onclick="window.removeModalPhoto(${i})">✕</button></div>`).join('');
     } else {
-        grid.innerHTML = `<div style="font-size: 12px; color: var(--danger); padding: 8px 0;">⚠️ No photos attached.</div>`;
+        grid.innerHTML = `<div style="font-size: 12px; color: var(--danger); padding: 8px 0;">No photos attached.</div>`;
     }
 }
 
-window.removeModalPhoto = function(i) {
+window.removeModalPhoto = function (i) {
     AppState.photos.splice(i, 1);
-    renderModalPhotos(); renderPreviews(); updateModalCounter(); updateMiniGalleryThumb(); saveAutoSaveData(); 
+    renderModalPhotos(); renderPreviews(); updateModalCounter(); updateMiniGalleryThumb(); saveAutoSaveData();
 }
 
 // ============================================================
 // UTILITIES & HELPERS
 // ============================================================
-window.openLightbox = function(src) { document.getElementById('lb-img').src = src; document.getElementById('lightbox').classList.add('open'); }
-window.closeLightbox = function() { document.getElementById('lightbox').classList.remove('open'); }
-window.closeDetail = function() { document.getElementById('detail-overlay').classList.remove('open'); }
-window.openDeleteRequest = function(id) { AppState.deleteTargetId = id; document.getElementById('delete-reason-input').value = ''; document.getElementById('delete-confirm-overlay').classList.add('open'); }
-window.closeDeleteRequest = function() { AppState.deleteTargetId = null; document.getElementById('delete-confirm-overlay').classList.remove('open'); }
-window.closeSaveConfirm = function() { document.getElementById('save-confirm-overlay').classList.remove('open'); AppState.pendingSaveData = null; }
+window.openLightbox = function (src) { document.getElementById('lb-img').src = src; document.getElementById('lightbox').classList.add('open'); }
+window.closeLightbox = function () { document.getElementById('lightbox').classList.remove('open'); }
+window.closeDetail = function () { document.getElementById('detail-overlay').classList.remove('open'); }
+window.openDeleteRequest = function (id) { AppState.deleteTargetId = id; document.getElementById('delete-reason-input').value = ''; document.getElementById('delete-confirm-overlay').classList.add('open'); }
+window.closeDeleteRequest = function () { AppState.deleteTargetId = null; document.getElementById('delete-confirm-overlay').classList.remove('open'); }
+window.closeSaveConfirm = function () { document.getElementById('save-confirm-overlay').classList.remove('open'); AppState.pendingSaveData = null; }
 
 // ============================================================
 // REQUEST DELETE MODULE
 // ============================================================
-window.executeDeleteRequest = async function() {
+window.executeDeleteRequest = async function () {
     const id = AppState.deleteTargetId;
     const reasonInput = document.getElementById('delete-reason-input');
     const reason = reasonInput.value.trim();
 
     if (!reason) {
-        toast('กรุณาระบุเหตุผลในการขอลบข้อมูล', false);
+        toast('Please provide a reason for the delete request.', false);
         reasonInput.focus();
         return;
     }
@@ -1394,13 +1476,13 @@ window.executeDeleteRequest = async function() {
             is_deleted: true
         });
 
-        toast('✅ ส่งคำร้องขอลบข้อมูลสำเร็จ');
+        toast('Delete request submitted successfully.');
         window.closeDeleteRequest();
         window.closeDetail();
         window.resetAndFetch();
     } catch (err) {
         console.error(err);
-        toast('เกิดข้อผิดพลาด: ' + err.message, false);
+        toast('An error occurred: ' + err.message, false);
     } finally {
         btn.disabled = false;
         btn.textContent = originalText;
@@ -1408,30 +1490,36 @@ window.executeDeleteRequest = async function() {
 };
 
 function getPosition() { const s = document.getElementById('f-position').value; return s === '__other__' ? document.getElementById('f-pos-other').value.trim() : s; }
-function bindPositionToggle() { document.getElementById('f-position').addEventListener('change', function() { document.getElementById('pos-other-wrap').style.display = this.value === '__other__' ? '' : 'none'; }); }
+function bindPositionToggle() { document.getElementById('f-position').addEventListener('change', function () { document.getElementById('pos-other-wrap').style.display = this.value === '__other__' ? '' : 'none'; }); }
 
 function esc(s) { if (s == null) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function today() { return new Date().toISOString().split('T')[0]; }
-function fmtDate(d) { 
-    if (!d) return ''; 
+function fmtDate(d) {
+    if (!d) return '';
     const dateObj = new Date(d);
-    if (isNaN(dateObj)) return d; 
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; 
-    return `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`; 
+    if (isNaN(dateObj)) return d;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
 }
 
-function updateCount() { 
-    const el = document.getElementById('rec-count'); 
-    if (!el) return; 
+function updateCount() {
+    const el = document.getElementById('rec-count');
+    if (!el) return;
     const count = AppState.totalCount || AppState.visits.length;
-    el.textContent = count + (count === 1 ? ' record' : ' records'); 
+    el.textContent = count + (count === 1 ? ' record' : ' records');
 }
 
-function toast(msg, ok = true) { 
-    const t = document.getElementById('toast'); 
-    if (!t) return; 
-    t.textContent = msg; t.style.background = ok ? 'var(--primary)' : 'var(--danger)'; 
-    t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3500); 
+function toast(msg, ok = true) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.style.background = ok ? 'var(--primary)' : 'var(--danger)';
+    t.setAttribute('data-type', ok ? 'success' : 'error');
+    t.textContent = msg;
+    t.classList.remove('show');
+    void t.offsetWidth; // force reflow to restart animation
+    t.classList.add('show');
+    clearTimeout(t._hideTimer);
+    t._hideTimer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
 function fileToDataUrl(file) {
@@ -1463,17 +1551,30 @@ function loadAvatarUI() {
     }
 }
 
-window.handleProfileUpload = async function(input) {
+window.handleProfileUpload = async function (input) {
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
     if (!file.type.startsWith('image/')) return;
+
     toast('Updating profile picture...', true);
+
     try {
-        const dataUrl = await fileToDataUrl(file);
-        AppState.userProfile.avatar = dataUrl;
+        const fileName = `avatar_${AppState.userProfile.empId}_${Date.now()}.jpg`;
+        const publicUrl = await DB.uploadFile('avatars', fileName, file, file.type);
+
+        await DB.update('user_information', `user_id=eq.${encodeURIComponent(AppState.userProfile.empId)}`, {
+            avatar: publicUrl
+        });
+
+        AppState.userProfile.avatar = publicUrl;
         localStorage.setItem(CONFIG.KEYS.PROFILE, JSON.stringify(AppState.userProfile));
-        loadAvatarUI(); toast('Profile picture updated!');
-    } catch (e) { toast('Failed to update picture.', false); }
+
+        loadAvatarUI();
+        toast('Profile picture updated!');
+    } catch (e) {
+        console.error("Avatar Upload Error:", e);
+        toast('Failed to update picture.', false);
+    }
     input.value = '';
 }
 
@@ -1482,11 +1583,11 @@ function updateModalCounter() { const el = document.getElementById('modal-photo-
 function updateMiniGalleryThumb() {
     const recentThumb = document.getElementById('camera-recent-thumb');
     if (!recentThumb) return;
-    if (AppState.photos.length > 0) { recentThumb.style.backgroundImage = `url(${AppState.photos[AppState.photos.length - 1]})`; recentThumb.style.opacity = '1'; } 
+    if (AppState.photos.length > 0) { recentThumb.style.backgroundImage = `url(${AppState.photos[AppState.photos.length - 1]})`; recentThumb.style.opacity = '1'; }
     else { recentThumb.style.opacity = '0'; }
 }
 
-window.openCameraGallery = function() {
+window.openCameraGallery = function () {
     if (AppState.photos.length === 0) return;
     document.getElementById('camera-header').style.display = 'none';
     document.getElementById('camera-body').style.display = 'none';
@@ -1495,7 +1596,7 @@ window.openCameraGallery = function() {
     renderCameraGallery();
 }
 
-window.closeCameraGallery = function() {
+window.closeCameraGallery = function () {
     document.getElementById('camera-header').style.display = 'flex';
     document.getElementById('camera-body').style.display = 'flex';
     document.getElementById('camera-footer').style.display = 'flex';
@@ -1507,9 +1608,9 @@ function renderCameraGallery() {
     document.getElementById('cg-grid').innerHTML = AppState.photos.map((p, i) => `<div class="cg-item"><img src="${p}" onclick="window.openLightbox('${p}')"><button class="cg-delete" onclick="window.removePhotoFromGallery(${i})">✕</button></div>`).join('');
 }
 
-window.removePhotoFromGallery = function(i) {
+window.removePhotoFromGallery = function (i) {
     AppState.photos.splice(i, 1);
-    renderPreviews(); updateModalCounter(); saveAutoSaveData(); 
+    renderPreviews(); updateModalCounter(); saveAutoSaveData();
     if (AppState.photos.length === 0) window.closeCameraGallery(); else renderCameraGallery();
 }
 
@@ -1525,11 +1626,11 @@ function renderPreviews() {
     }
 }
 
-window.removePhoto = function(i) { AppState.photos.splice(i, 1); renderPreviews(); updateModalCounter(); updateMiniGalleryThumb(); saveAutoSaveData(); }
+window.removePhoto = function (i) { AppState.photos.splice(i, 1); renderPreviews(); updateModalCounter(); updateMiniGalleryThumb(); saveAutoSaveData(); }
 function renderThumbStrip(ph) { if (!ph || !ph.length) return ''; return `<div class="vc-thumbs">${ph.slice(0, 5).map(p => `<div class="vc-thumb"><img src="${p}"></div>`).join('')}${ph.length > 5 ? `<div class="vc-thumb">+${ph.length - 5}</div>` : ''}</div>`; }
 
-window.toggleProfileMenu = function() { document.getElementById('profile-dropdown').classList.toggle('show'); }
-window.addEventListener('click', function(e) {
+window.toggleProfileMenu = function () { document.getElementById('profile-dropdown').classList.toggle('show'); }
+window.addEventListener('click', function (e) {
     const wrap = document.getElementById('profile-menu-wrap'); const dropdown = document.getElementById('profile-dropdown');
     if (wrap && dropdown && !wrap.contains(e.target)) dropdown.classList.remove('show');
 });
@@ -1543,41 +1644,52 @@ function initDarkMode() {
         document.querySelectorAll('.sun-icon').forEach(el => el.style.display = 'block');
     }
 }
-window.toggleDarkMode = function() {
+window.toggleDarkMode = function () {
     const isDark = document.body.classList.toggle('dark-mode');
     localStorage.setItem('checklist_theme', isDark ? 'dark' : 'light');
     document.querySelectorAll('.moon-icon').forEach(el => el.style.display = isDark ? 'none' : 'block');
     document.querySelectorAll('.sun-icon').forEach(el => el.style.display = isDark ? 'block' : 'none');
 }
 
-window.playWelcomeAnimation = function(name, callback) {
+window.playWelcomeAnimation = function (name, callback) {
     const screen = document.getElementById('welcome-screen');
     const text = document.getElementById('welcome-text');
-    const avatar = document.getElementById('welcome-avatar');
-    
-    // ซ่อนหน้า Login
+    const avatarText = document.getElementById('welcome-avatar-text');
+    const avatarImg = document.getElementById('welcome-avatar-img');
+
     document.getElementById('login-screen').style.display = 'none';
-    
-    // ดึงชื่อคำแรกมาแสดง (ตัดช่องว่าง)
     const firstName = name ? name.split(' ')[0] : 'User';
     text.textContent = `Hello, ${firstName}!`;
-    avatar.textContent = firstName.charAt(0).toUpperCase(); // ใช้ตัวอักษรแรก
-    
-    // รีเซ็ตคลาสและแสดงหน้า Welcome
+
+    if (AppState.userProfile.avatar) {
+        if (avatarImg) {
+            avatarImg.src = AppState.userProfile.avatar;
+            avatarImg.style.display = 'block';
+        }
+        if (avatarText) avatarText.style.display = 'none';
+    } else {
+        if (avatarImg) avatarImg.style.display = 'none';
+        if (avatarText) {
+            avatarText.textContent = firstName.charAt(0).toUpperCase();
+            avatarText.style.display = 'block';
+        }
+    }
+
     screen.classList.remove('welcome-fade-out', 'animate-welcome');
     screen.style.display = 'flex';
-    
-    // เริ่มแอนิเมชันเด้งขึ้นมา
     setTimeout(() => {
         screen.classList.add('animate-welcome');
     }, 50);
-    
-    // โชว์ค้างไว้ 2 วินาที แล้ว Fade out ค่อยเข้าแอปหลัก
     setTimeout(() => {
         screen.classList.add('welcome-fade-out');
         setTimeout(() => {
             screen.style.display = 'none';
-            if(callback) callback(); // เรียกคำสั่งเข้าหน้าแอปหลัก (showMainApp)
-        }, 500); // รอให้ Fade out จบ (0.5 วินาที)
-    }, 2000); 
+            if (callback) callback();
+        }, 500);
+    }, 2000);
 };
+
+window.toggleSidebar = function() {
+    document.querySelector('.sidebar').classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('show');
+}
