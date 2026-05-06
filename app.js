@@ -1109,20 +1109,37 @@ function showMainApp() {
     initApp();
 }
 
+// ค้นหาฟังก์ชัน switchTab และเปลี่ยนเป็นโค้ดนี้ครับ
 window.switchTab = function (tab) {
     if (tab !== 'new') window.stopCamera();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (tab === 'new' && i === 0) || (tab === 'list' && i === 1)));
     document.getElementById('tab-new').style.display = tab === 'new' ? '' : 'none';
     document.getElementById('tab-list').style.display = tab === 'list' ? '' : 'none';
 
-    // อัปเดต Page Title ด้านขวาให้สอดคล้องกับเมนูที่เลือก
+    // เปลี่ยน Page Title ที่ Header ขวาบน
     const pageTitle = document.getElementById('page-title');
     if (pageTitle) {
         pageTitle.textContent = tab === 'new' ? 'New Visit' : 'All Visits';
     }
 
     if (tab === 'list') { AppState.currentPage = 0; fetchVisitsWithSkeleton(); }
-}
+
+    // ปิด Sidebar อัตโนมัติเมื่อกดเลือกเมนู (สำหรับมือถือ)
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('show');
+    }
+};
+
+// เพิ่มฟังก์ชัน toggleSidebar (หากยังไม่มี)
+window.toggleSidebar = function() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.toggle('open');
+    if (overlay) overlay.classList.toggle('show');
+};
 
 async function fetchVisitsWithSkeleton() {
     document.getElementById('visit-list').innerHTML = '';
