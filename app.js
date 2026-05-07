@@ -7,7 +7,8 @@ const CONFIG = {
         SESSION: 'checklist_user_session',
         REMEMBER: 'checklist_user_remember',
         AUTOSAVE: 'checklist_autosave_v1',
-        LOGIN_AT: 'checklist_login_at'
+        LOGIN_AT: 'checklist_login_at',
+        APPOINTMENTS: 'checklist_calendar_appointments' // เพิ่มคีย์สำหรับเก็บนัดหมาย
     },
     SUPABASE: {
         URL: 'https://bvonujjvovziubyhqsjx.supabase.co',
@@ -111,12 +112,17 @@ let AppState = {
     tomSelectCustomer: null,
     loggedInUser: null,
     realtimeChannel: null,
+    visitRealtimeChannel: null,
+    notifInterval: null,
     totalPages: 1,
     totalCount: 0,
     fpDate: null,
     fpNextDate: null,
     fpFilterDate: null,
-    isClearingForm: false
+    isClearingForm: false,
+    calendarObj: null,
+    localAppointments: [],
+    notifications: [] // เก็บ notification list
 };
 
 // ============================================================
@@ -161,6 +167,16 @@ async function checkSession() {
             avatar: localProfile.avatar || ''
         };
 
+        // โหลดนัดหมายจาก LocalStorage
+        const savedApts = localStorage.getItem(CONFIG.KEYS.APPOINTMENTS);
+        if (savedApts) AppState.localAppointments = JSON.parse(savedApts);
+
+        // โหลด notifications จาก localStorage
+        try {
+            const savedNotifs = localStorage.getItem('visitation_notifications');
+            if (savedNotifs) AppState.notifications = JSON.parse(savedNotifs);
+        } catch (e) { AppState.notifications = []; }
+
         showMainApp();
         return true;
     } catch (e) {
@@ -190,7 +206,39 @@ function initApp() {
     });
 
     AppState.fpNextDate = flatpickr("#f-next-date", {
-        altInput: true, altFormat: "d M Y", dateFormat: "Y-m-d", minDate: "today"
+        altInput: true,
+        altFormat: "d M Y",
+        dateFormat: "Y-m-d",
+        minDate: "today",
+        onReady: function (_, __, fp) {
+            // inject time dropdowns below calendar
+            const cal = fp.calendarContainer;
+            const timeRow = document.createElement('div');
+            timeRow.className = 'fp-custom-time-row';
+            timeRow.innerHTML = `
+                <span class="fp-time-label">Time</span>
+                <select id="fp-next-hour" class="fp-time-select">
+                    ${Array.from({ length: 24 }, (_, i) => `<option value="${String(i).padStart(2, '0')}">${String(i).padStart(2, '0')}</option>`).join('')}
+                </select>
+                <span class="fp-time-sep">:</span>
+                <select id="fp-next-min" class="fp-time-select">
+                    ${['00', '15', '30', '45'].map(m => `<option value="${m}">${m}</option>`).join('')}
+                </select>`;
+            cal.appendChild(timeRow);
+            // default 09:00
+            document.getElementById('fp-next-hour').value = '09';
+        },
+        onClose: function (selectedDates, dateStr, fp) {
+            if (!selectedDates[0]) return;
+            const h = document.getElementById('fp-next-hour')?.value || '09';
+            const m = document.getElementById('fp-next-min')?.value || '00';
+            // store datetime in hidden field format
+            const d = selectedDates[0];
+            const pad = n => String(n).padStart(2, '0');
+            const full = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${h}:${m}`;
+            fp.input.value = full;
+            fp.altInput.value = `${pad(d.getDate())} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()} ${h}:${m}`;
+        }
     });
 
     AppState.fpFilterDate = flatpickr("#fl-date-wrap", {
@@ -430,6 +478,14 @@ window.doUserLogout = function () {
         try { AppState.realtimeChannel.unsubscribe(); } catch (e) { }
         AppState.realtimeChannel = null;
     }
+    if (AppState.visitRealtimeChannel) {
+        try { AppState.visitRealtimeChannel.unsubscribe(); } catch (e) { }
+        AppState.visitRealtimeChannel = null;
+    }
+    if (AppState.notifInterval) {
+        clearInterval(AppState.notifInterval);
+        AppState.notifInterval = null;
+    }
 
     AppState.loggedInUser = null;
     AppState.userProfile = { empId: '', name: '', email: '', team: '', area: '', contact: '', avatar: '' };
@@ -557,6 +613,26 @@ async function loadVisitsFromDB() {
                 extractedPerson = v.bde || '';
             }
 
+            // แยกวันที่และเวลานัดหมายครั้งถัดไป
+            let nextDateStr = null;
+            const matchNext = (v.visit_result || '').match(/Schedule Next Visit:\s*([0-9]{1,2}\s[A-Za-z]{3}\s[0-9]{4}(?:\s[0-9]{2}:[0-9]{2})?)/);
+            if (matchNext) {
+                const d = new Date(matchNext[1]);
+                if (!isNaN(d)) {
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+
+                    if (matchNext[1].includes(':')) {
+                        nextDateStr = `${year}-${month}-${day}T${hours}:${minutes}:00`;
+                    } else {
+                        nextDateStr = `${year}-${month}-${day}`;
+                    }
+                }
+            }
+
             return {
                 id: v.id,
                 outlet: v.name_of_outlet || v.customer_id || '',
@@ -573,7 +649,8 @@ async function loadVisitsFromDB() {
                 is_deleted: v.is_deleted === true,
                 delete_reason: v.delete_reason || '',
                 req_status: v.req_status || null,
-                userArea: usersMap[v.user_id] || ''
+                userArea: usersMap[v.user_id] || '',
+                next_visit_date: nextDateStr
             };
         });
 
@@ -619,24 +696,6 @@ function renderPagination() {
         </div>
         <div class="pagination-info">Page ${current + 1} of ${total}</div>
     `;
-}
-
-function setupRealtime() {
-    if (AppState.realtimeChannel) return;
-    try {
-        if (typeof window.supabase !== 'undefined') {
-            const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
-            AppState.realtimeChannel = client
-                .channel('app-realtime')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'visitation' }, () => loadVisitsFromDB())
-                .subscribe();
-        } else {
-            AppState.realtimeChannel = setInterval(() => loadVisitsFromDB(), 30000);
-        }
-    } catch (e) {
-        console.warn('Realtime setup failed, using polling fallback');
-        AppState.realtimeChannel = setInterval(() => loadVisitsFromDB(), 30000);
-    }
 }
 
 async function uploadPhotosToStorage(recordId) {
@@ -827,9 +886,45 @@ function bindAutoSave() {
     const inputs = ['f-customer', 'f-main-team', 'f-sub-team', 'f-person', 'f-position', 'f-pos-other', 'f-date', 'f-reason', 'f-result', 'f-next-date'];
     inputs.forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.addEventListener('input', saveAutoSaveData); el.addEventListener('change', saveAutoSaveData); }
+        if (el) {
+            el.addEventListener('input',  () => { saveAutoSaveData(); updateSaveBtn(); });
+            el.addEventListener('change', () => { saveAutoSaveData(); updateSaveBtn(); });
+        }
     });
-    document.querySelectorAll('.f-followup').forEach(cb => { cb.addEventListener('change', saveAutoSaveData); });
+    document.querySelectorAll('.f-followup').forEach(cb => {
+        cb.addEventListener('change', () => { saveAutoSaveData(); updateSaveBtn(); });
+    });
+    updateSaveBtn();
+}
+
+// ============================================================
+// SAVE BUTTON STATE — disable until required fields are filled
+// ============================================================
+function updateSaveBtn() {
+    const btn = document.getElementById('btn-save');
+    if (!btn) return;
+
+    const customer = document.getElementById('f-customer')?.value;
+    const person   = document.getElementById('f-person')?.value?.trim();
+    const position = document.getElementById('f-position')?.value;
+    const date     = document.getElementById('f-date')?.value;
+    const reason   = document.getElementById('f-reason')?.value?.trim();
+    const result   = document.getElementById('f-result')?.value?.trim();
+    const followupChecked = Array.from(document.querySelectorAll('.f-followup')).some(cb => cb.checked);
+    const hasPhoto = AppState.photos.length > 0;
+
+    let posOk = position && position !== '';
+    if (position === '__other__') {
+        posOk = !!document.getElementById('f-pos-other')?.value?.trim();
+    }
+
+    const resultOk = !!result || followupChecked;
+    const ready = !!(customer && person && posOk && date && reason && resultOk && hasPhoto);
+
+    btn.disabled = !ready;
+    btn.style.opacity = ready ? '1' : '0.45';
+    btn.style.cursor  = ready ? 'pointer' : 'not-allowed';
+    btn.style.transform = '';
 }
 
 async function saveAutoSaveData() {
@@ -897,6 +992,7 @@ async function loadAutoSaveData() {
         }
 
         if (hasData) { toast('Draft restored automatically.', true); }
+        updateSaveBtn();
     } catch (e) { console.error("Failed to load autosave", e); }
 }
 
@@ -918,6 +1014,7 @@ window.clearForm = function () {
     renderPreviews(); window.stopCamera();
     localforage.removeItem(CONFIG.KEYS.AUTOSAVE).finally(() => {
         AppState.isClearingForm = false;
+        updateSaveBtn();
     });
 }
 
@@ -955,7 +1052,12 @@ window.triggerSaveConfirm = function () {
 
     for (const field of requiredFields) {
         const el = document.getElementById(field.id);
-        if (!el || !el.value.trim()) {
+        // f-main-team และ f-sub-team อาจถูก disabled และ value ว่างในบางกรณี
+        // ให้ fallback ไปดู userProfile แทน
+        let val = el ? el.value.trim() : '';
+        if (!val && field.id === 'f-main-team') val = AppState.userProfile.team || '';
+        if (!val && field.id === 'f-sub-team') val = AppState.userProfile.subTeam || AppState.userProfile.area || '';
+        if (!val) {
             toast(`Please fill in: ${field.name}`, false);
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus();
@@ -1107,24 +1209,68 @@ function showMainApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
     initApp();
+    // เริ่มระบบแจ้งเตือนหลัง login
+    setTimeout(() => {
+        scheduleNotifications();
+        if (AppState.notifInterval) clearInterval(AppState.notifInterval);
+        AppState.notifInterval = setInterval(scheduleNotifications, 60000);
+        setupVisitRealtime();
+        renderNotifPanel();
+    }, 1500);
 }
 
-// ค้นหาฟังก์ชัน switchTab และเปลี่ยนเป็นโค้ดนี้ครับ
 window.switchTab = function (tab) {
     if (tab !== 'new') window.stopCamera();
-    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (tab === 'new' && i === 0) || (tab === 'list' && i === 1)));
-    document.getElementById('tab-new').style.display = tab === 'new' ? '' : 'none';
-    document.getElementById('tab-list').style.display = tab === 'list' ? '' : 'none';
 
-    // เปลี่ยน Page Title ที่ Header ขวาบน
+    const tabs = ['new', 'list', 'calendar'];
+    document.querySelectorAll('.sidebar-nav .tab').forEach((t, i) => {
+        t.classList.toggle('active', tabs[i] === tab);
+    });
+
+    tabs.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (!el) return;
+        el.classList.remove('tab-enter');
+        if (t === tab) {
+            el.style.display = '';
+            // Force reflow so animation re-triggers
+            void el.offsetWidth;
+            el.classList.add('tab-enter');
+        } else {
+            el.style.display = 'none';
+        }
+    });
+
     const pageTitle = document.getElementById('page-title');
     if (pageTitle) {
-        pageTitle.textContent = tab === 'new' ? 'New Visit' : 'All Visits';
+        const lang = AppState.currentLang || 'en';
+        const titles = {
+            new: { en: 'New Visit', th: 'บันทึกการเยี่ยม' },
+            list: { en: 'All Visits', th: 'ประวัติทั้งหมด' },
+            calendar: { en: 'Calendar Schedule', th: 'ปฏิทินนัดหมาย' }
+        };
+        if (titles[tab]) pageTitle.textContent = titles[tab][lang] || titles[tab].en;
+    }
+
+    // แสดง rec-count เฉพาะหน้า All Visits (ทุก screen size)
+    const recCount = document.getElementById('rec-count');
+    if (recCount) {
+        recCount.style.display = tab === 'list' ? 'inline-block' : 'none';
     }
 
     if (tab === 'list') { AppState.currentPage = 0; fetchVisitsWithSkeleton(); }
 
-    // ปิด Sidebar อัตโนมัติเมื่อกดเลือกเมนู (สำหรับมือถือ)
+    if (tab === 'calendar') {
+        setTimeout(() => {
+            if (!AppState.calendarObj) {
+                window.initCalendar();
+            } else {
+                AppState.calendarObj.render();
+                window.updateCalendarEvents();
+            }
+        }, 100);
+    }
+
     if (window.innerWidth <= 768) {
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.getElementById('sidebar-overlay');
@@ -1133,8 +1279,7 @@ window.switchTab = function (tab) {
     }
 };
 
-// เพิ่มฟังก์ชัน toggleSidebar (หากยังไม่มี)
-window.toggleSidebar = function() {
+window.toggleSidebar = function () {
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (sidebar) sidebar.classList.toggle('open');
@@ -1149,6 +1294,19 @@ async function fetchVisitsWithSkeleton() {
     document.getElementById('visit-list-loading').style.display = 'none';
     renderList(); renderPagination();
 }
+
+window.clearAllFilters = function () {
+    const area = document.getElementById('fl-area');
+    const pos  = document.getElementById('fl-pos');
+    const search = document.getElementById('fl-search');
+    const posOther = document.getElementById('fl-pos-other');
+    if (area)   area.value = '';
+    if (pos)    pos.value = '';
+    if (search) search.value = '';
+    if (posOther) { posOther.value = ''; posOther.style.display = 'none'; }
+    if (AppState.fpFilterDate) AppState.fpFilterDate.clear();
+    resetAndFetch();
+};
 
 window.renderList = function () {
     const area = document.getElementById('fl-area').value;
@@ -1169,7 +1327,50 @@ window.renderList = function () {
     });
 
     const el = document.getElementById('visit-list');
-    if (!filtered.length) { el.innerHTML = `<div class="empty-state"><p>No records found.</p></div>`; return; }
+
+    if (!filtered.length) {
+        const hasFilters = area || pos || filterDate || q;
+        const lang = AppState.currentLang || 'en';
+
+        if (hasFilters) {
+            // filtered but no results
+            el.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            <line x1="8" y1="11" x2="14" y2="11"/>
+                        </svg>
+                    </div>
+                    <div class="empty-state-title">${lang === 'th' ? 'ไม่พบข้อมูลที่ตรงกัน' : 'No matching records'}</div>
+                    <div class="empty-state-sub">${lang === 'th' ? 'ลองเปลี่ยน filter หรือล้างการค้นหา' : 'Try adjusting your filters or clearing the search'}</div>
+                    <button class="empty-state-btn" onclick="clearAllFilters()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        ${lang === 'th' ? 'ล้าง Filter' : 'Clear Filters'}
+                    </button>
+                </div>`;
+        } else {
+            // truly empty — no visits yet
+            el.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <div class="empty-state-title">${lang === 'th' ? 'ยังไม่มีการบันทึก' : 'No visits recorded yet'}</div>
+                    <div class="empty-state-sub">${lang === 'th' ? 'เริ่มบันทึกการเยี่ยมลูกค้าครั้งแรกได้เลย' : 'Start by logging your first customer visit'}</div>
+                    <button class="empty-state-btn" onclick="switchTab('new')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        ${lang === 'th' ? 'บันทึกการเยี่ยม' : 'New Visit'}
+                    </button>
+                </div>`;
+        }
+        return;
+    }
 
     el.innerHTML = '';
     const template = document.getElementById('visit-card-template');
@@ -1418,7 +1619,37 @@ window.enableModalEdit = function () {
     renderModalPhotos();
 
     flatpickr("#m-date", { altInput: true, altFormat: "d M Y", dateFormat: "Y-m-d", minDate: "today", maxDate: "today" });
-    flatpickr("#m-next-date", { altInput: true, altFormat: "d M Y", dateFormat: "Y-m-d", minDate: "today" });
+    flatpickr("#m-next-date", {
+        altInput: true,
+        altFormat: "d M Y",
+        dateFormat: "Y-m-d",
+        minDate: "today",
+        onReady: function (_, __, fp) {
+            const cal = fp.calendarContainer;
+            const timeRow = document.createElement('div');
+            timeRow.className = 'fp-custom-time-row';
+            timeRow.innerHTML = `
+                <span class="fp-time-label">Time</span>
+                <select id="fp-mnext-hour" class="fp-time-select">
+                    ${Array.from({ length: 24 }, (_, i) => `<option value="${String(i).padStart(2, '0')}">${String(i).padStart(2, '0')}</option>`).join('')}
+                </select>
+                <span class="fp-time-sep">:</span>
+                <select id="fp-mnext-min" class="fp-time-select">
+                    ${['00', '15', '30', '45'].map(m => `<option value="${m}">${m}</option>`).join('')}
+                </select>`;
+            cal.appendChild(timeRow);
+            document.getElementById('fp-mnext-hour').value = '09';
+        },
+        onClose: function (selectedDates, dateStr, fp) {
+            if (!selectedDates[0]) return;
+            const h = document.getElementById('fp-mnext-hour')?.value || '09';
+            const m = document.getElementById('fp-mnext-min')?.value || '00';
+            const d = selectedDates[0];
+            const pad = n => String(n).padStart(2, '0');
+            fp.input.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${h}:${m}`;
+            fp.altInput.value = `${pad(d.getDate())} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()} ${h}:${m}`;
+        }
+    });
 }
 
 window.updateModalSubTeam = function (mainTeam) {
@@ -1517,6 +1748,13 @@ function fmtDate(d) {
     if (isNaN(dateObj)) return d;
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+}
+
+function fmtDateTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function updateCount() {
@@ -1641,6 +1879,7 @@ function renderPreviews() {
     } else {
         capturedSection.style.display = 'none'; previewContainer.innerHTML = '';
     }
+    updateSaveBtn();
 }
 
 window.removePhoto = function (i) { AppState.photos.splice(i, 1); renderPreviews(); updateModalCounter(); updateMiniGalleryThumb(); saveAutoSaveData(); }
@@ -1706,7 +1945,1160 @@ window.playWelcomeAnimation = function (name, callback) {
     }, 2000);
 };
 
-window.toggleSidebar = function() {
+window.toggleSidebar = function () {
     document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('show');
 }
+
+
+// ============================================================
+// REALTIME NOTIFICATION & CALENDAR MODULE (Supabase Edition)
+// ============================================================
+
+window.setupRealtime = function () {
+    if (AppState.realtimeChannel) return;
+    try {
+        if (typeof window.supabase !== 'undefined') {
+            const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+            AppState.realtimeChannel = client
+                .channel('app-realtime')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'visitation' }, (payload) => {
+                    if (payload.new.user_id !== AppState.userProfile.empId) {
+                        const badge = document.getElementById('notif-badge');
+                        if (badge) badge.style.display = 'block';
+                        toast(`New event: ${payload.new.name_of_outlet}`, true);
+                    }
+                    loadVisitsFromDB().then(() => { if (window.updateCalendarEvents) window.updateCalendarEvents(); });
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'visitation' }, (payload) => {
+                    if (payload.new.req_status === 'pending' && (!payload.old || payload.old.req_status !== 'pending')) {
+                        const badge = document.getElementById('notif-badge');
+                        if (badge) badge.style.display = 'block';
+                        toast(`Delete Request: ${payload.new.bde || 'User'} @ ${payload.new.name_of_outlet}`, false);
+                    }
+                    loadVisitsFromDB().then(() => { if (window.updateCalendarEvents) window.updateCalendarEvents(); });
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+                    if (AppState.calendarObj) AppState.calendarObj.refetchEvents();
+                })
+                .subscribe();
+        } else {
+            AppState.realtimeChannel = setInterval(() => {
+                loadVisitsFromDB().then(() => { if (window.updateCalendarEvents) window.updateCalendarEvents(); });
+            }, 30000);
+        }
+    } catch (e) {
+        console.warn('Realtime setup failed, using polling fallback');
+        AppState.realtimeChannel = setInterval(() => {
+            loadVisitsFromDB().then(() => { if (window.updateCalendarEvents) window.updateCalendarEvents(); });
+        }, 30000);
+    }
+};
+
+// ============================================================
+// ระบบที่ 3 — VISIT RECORDS REALTIME (Approve/Delete notif)
+// ============================================================
+window.setupVisitRealtime = function () {
+    if (AppState.visitRealtimeChannel) return;
+    if (typeof window.supabase === 'undefined') return;
+    try {
+        const empId = AppState.userProfile.empId;
+        const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+        AppState.visitRealtimeChannel = client
+            .channel('visit-records-realtime')
+            .on('postgres_changes', {
+                event: 'UPDATE', schema: 'public', table: 'visit_records'
+            }, (payload) => {
+                const rec = payload.new;
+                // filter เฉพาะ user เจ้าของ
+                if (rec.user_id && rec.user_id !== empId) return;
+                const outlet = rec.outlet_name || rec.name_of_outlet || 'Visit';
+                let icon = '', msg = '';
+                if (rec.req_status === 'approved') {
+                    icon = '✅'; msg = `${outlet} - Visit Approved`;
+                } else if (rec.req_status === 'rejected') {
+                    icon = '❌'; msg = `Visit Rejected`;
+                }
+                if (msg) {
+                    _pushNotification(icon, msg);
+                    toast(`${icon} ${msg}`, rec.req_status === 'approved');
+                }
+            })
+            .on('postgres_changes', {
+                event: 'DELETE', schema: 'public', table: 'visit_records'
+            }, (payload) => {
+                const rec = payload.old;
+                if (rec.user_id && rec.user_id !== empId) return;
+                _pushNotification('🗑️', 'Visit record deleted by admin');
+                toast('🗑️ Visit record deleted by admin', false);
+            })
+            .subscribe();
+    } catch (e) {
+        console.warn('Visit realtime setup failed:', e);
+    }
+};
+
+// ============================================================
+// ระบบที่ 2 — SCHEDULE NOTIFICATIONS (remind before)
+// ============================================================
+window.scheduleNotifications = async function () {
+    try {
+        const uid = AppState.userProfile.empId;
+        if (!uid) return;
+        const now = Date.now();
+        const twoHours = now + 2 * 3600000;
+
+        // ดึง appointments ของ user ที่ start_at อยู่ในอนาคต + remind_minutes > 0
+        const params = [
+            `user_id=eq.${encodeURIComponent(uid)}`,
+            `start_at=gte.${new Date().toISOString()}`,
+            `remind_minutes=gt.0`,
+            `status=neq.cancelled`,
+            `select=id,title,outlet_name,start_at,remind_minutes`,
+            `order=start_at.asc`
+        ].join('&');
+        const apts = await DB.select('appointments', params) || [];
+
+        let hasSoon = false;
+        for (const apt of apts) {
+            const startMs = new Date(apt.start_at).getTime();
+            if (startMs <= twoHours) hasSoon = true;
+
+            const notifyAt = startMs - apt.remind_minutes * 60000;
+            const key = `notified_apt_${apt.id}`;
+            if (now >= notifyAt && !localStorage.getItem(key)) {
+                localStorage.setItem(key, '1');
+                const name = apt.outlet_name || apt.title || 'Appointment';
+                const pad = n => String(n).padStart(2, '0');
+                const d = new Date(startMs);
+                const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                const minsLeft = Math.round((startMs - now) / 60000);
+                const label = minsLeft >= 60
+                    ? `in ${Math.round(minsLeft / 60)}h`
+                    : minsLeft > 0 ? `in ${minsLeft} min` : 'Now!';
+                const msg = `${name} - ${timeStr} (${label})`;
+
+                // Toast
+                toast(msg, true);
+
+                // Web Notification API
+                _sendWebNotification('Visitation Reminder', msg);
+
+                // เก็บใน notification panel
+                _pushNotification('🔕', msg);
+            }
+        }
+
+        // Badge dot ถ้ามีนัดใน 2 ชั่วโมงข้างหน้า
+        const badge = document.getElementById('notif-badge');
+        if (badge) badge.style.display = hasSoon ? 'block' : badge.style.display;
+
+        // Request permission ครั้งแรก
+        if (Notification && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    } catch (e) {
+        console.warn('scheduleNotifications error:', e);
+    }
+};
+
+function _sendWebNotification(title, body) {
+    try {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'granted') {
+            new Notification(title, { body, icon: '/icon.png' });
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(p => {
+                if (p === 'granted') new Notification(title, { body, icon: '/icon.png' });
+            });
+        }
+    } catch (e) { }
+}
+
+// ============================================================
+// NOTIFICATION STORAGE & PANEL
+// ============================================================
+function _pushNotification(icon, message) {
+    const notif = { icon, message, time: Date.now(), id: Date.now() + Math.random() };
+    AppState.notifications.unshift(notif);
+    if (AppState.notifications.length > 50) AppState.notifications = AppState.notifications.slice(0, 50);
+    _saveNotifications();
+
+    // แสดง badge
+    const badge = document.getElementById('notif-badge');
+    if (badge) badge.style.display = 'block';
+
+    renderNotifPanel();
+}
+
+function _saveNotifications() {
+    try {
+        localStorage.setItem('visitation_notifications', JSON.stringify(AppState.notifications));
+    } catch (e) { }
+}
+
+function _relativeTime(ms) {
+    const diff = Math.round((Date.now() - ms) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+    return `${Math.floor(diff / 86400)} d ago`;
+}
+
+window.renderNotifPanel = function () {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+    if (!AppState.notifications.length) {
+        list.innerHTML = '<div class="notif-empty">No notifications</div>';
+        return;
+    }
+    list.innerHTML = AppState.notifications.map(n => `
+        <div class="notif-item">
+            
+            <div class="notif-content">
+                <div class="notif-msg">${n.message}</div>
+                <div class="notif-time">${_relativeTime(n.time)}</div>
+            </div>
+        </div>
+    `).join('');
+};
+
+window.toggleNotifPanel = function () {
+    const panel = document.getElementById('notif-panel');
+    if (!panel) return;
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) {
+        // ซ่อน badge เมื่อเปิด panel
+        const badge = document.getElementById('notif-badge');
+        if (badge) badge.style.display = 'none';
+        renderNotifPanel();
+    }
+};
+
+window.clearAllNotifications = function () {
+    AppState.notifications = [];
+    _saveNotifications();
+    renderNotifPanel();
+    const badge = document.getElementById('notif-badge');
+    if (badge) badge.style.display = 'none';
+};
+
+// ปิด panel เมื่อคลิกนอก
+window.addEventListener('click', function (e) {
+    const panel = document.getElementById('notif-panel');
+    const bell = document.getElementById('notif-bell');
+    if (panel && bell && !bell.parentElement.contains(e.target)) {
+        panel.style.display = 'none';
+    }
+});
+
+// ============================================================
+// CALENDAR DB — CRUD สำหรับ appointments table
+// ============================================================
+const CalendarDB = {
+    async fetchRange(start, end) {
+        const uid = AppState.userProfile.empId;
+        if (!uid) return [];
+        try {
+            const params = [
+                `user_id=eq.${encodeURIComponent(uid)}`,
+                `start_at=gte.${start.toISOString()}`,
+                `start_at=lt.${end.toISOString()}`,
+                `status=neq.cancelled`,
+                `select=*`,
+                `order=start_at.asc`
+            ].join('&');
+            return await DB.select('appointments', params) || [];
+        } catch (e) {
+            console.error('CalendarDB.fetchRange:', e);
+            return [];
+        }
+    },
+
+    async create(payload) {
+        const uid = AppState.userProfile.empId;
+        const record = {
+            title: payload.title,
+            description: payload.description || null,
+            start_at: payload.start,
+            end_at: payload.end,
+            all_day: payload.allDay || false,
+            location: payload.location || null,
+            color: payload.color || '#1E88E5',
+            type: payload.type || 'personal',
+            remind_minutes: parseInt(payload.remindMinutes) || 30,
+            user_id: uid,
+            created_by: uid,
+            outlet_name: payload.outletName || null,
+            visit_id: payload.visitId || null
+        };
+        const result = await DB.insert('appointments', record);
+        return result && result[0];
+    },
+
+    async update(id, payload) {
+        const record = {};
+        if (payload.start !== undefined) record.start_at = payload.start;
+        if (payload.end !== undefined) record.end_at = payload.end;
+        if (payload.title !== undefined) record.title = payload.title;
+        if (payload.color !== undefined) record.color = payload.color;
+        if (payload.status !== undefined) record.status = payload.status;
+        if (payload.description !== undefined) record.description = payload.description;
+        if (payload.location !== undefined) record.location = payload.location;
+        if (payload.type !== undefined) record.type = payload.type;
+        if (payload.remindMinutes !== undefined) record.remind_minutes = parseInt(payload.remindMinutes);
+        await DB.update('appointments', `id=eq.${id}`, record);
+    },
+
+    async delete(id) {
+        await DB.query(`appointments?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
+    }
+};
+
+// ============================================================
+// FULLCALENDAR INIT
+// ============================================================
+window.initCalendar = function () {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+
+    AppState.calendarObj = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'timeGridWeek',
+        themeSystem: 'standard',
+        locale: 'en',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+        },
+        buttonText: { today: 'Today', month: 'Month', week: 'Week', day: 'Day', list: 'List' },
+        dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+        height: 'calc(100vh - 160px)',
+
+        // 🟢 เปิดใช้งานการลากคลุมช่วงเวลา + ลากเพื่อย้ายนัดหมาย
+        nowIndicator: true,
+        selectable: true,
+        selectMirror: true,
+        editable: true,
+
+        slotMinTime: '06:00:00',
+        slotMaxTime: '23:00:00',
+        slotDuration: '00:30:00',
+        displayEventTime: true,
+        eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+
+        // 🟢 เมื่อลากคลุมช่วงเวลาเสร็จ ให้เปิด Modal สร้างนัดหมาย
+        select: function (info) {
+            window.openAppointmentModal(info.start, info.end, info.allDay);
+            AppState.calendarObj.unselect();
+        },
+
+        // 🟢 จัดการเมื่อ "ลาก" เพื่อเปลี่ยนวันหรือเวลา
+        eventDrop: async function (info) {
+            const ep = info.event.extendedProps;
+            if (ep.isVisit) {
+                info.revert();
+                toast('Cannot move auto-generated appointments.', false);
+                return;
+            }
+            try {
+                await CalendarDB.update(ep.dbId, {
+                    start: info.event.start.toISOString(),
+                    end: info.event.end ? info.event.end.toISOString() : new Date(info.event.start.getTime() + 3600000).toISOString()
+                });
+                toast('Appointment moved.', true);
+            } catch (err) {
+                console.error(err);
+                info.revert();
+                toast('Could not change time: ' + err.message, false);
+            }
+        },
+
+        // 🟢 จัดการเมื่อ "ยืด/หด" เวลา (Resize)
+        eventResize: async function (info) {
+            const ep = info.event.extendedProps;
+            if (ep.isVisit) {
+                info.revert();
+                return;
+            }
+            try {
+                await CalendarDB.update(ep.dbId, {
+                    start: info.event.start.toISOString(),
+                    // FIX: สร้างเวลาสำรอง +1 ชั่วโมง ถ้าลากแล้วค่า end หายไป
+                    end: info.event.end ? info.event.end.toISOString() : new Date(info.event.start.getTime() + 3600000).toISOString()
+                });
+                toast('Appointment duration updated.', true);
+            } catch (err) {
+                console.error(err);
+                info.revert();
+                toast('Could not update time: ' + err.message, false);
+            }
+        },
+
+        events: async function (info, successCallback, failureCallback) {
+            try {
+                // 1. Manual scheduled visits from appointments table
+                const apts = await CalendarDB.fetchRange(info.start, info.end);
+                const aptEvents = apts.map(a => {
+                    const startMs = new Date(a.start_at).setHours(0, 0, 0, 0);
+                    const endMs = a.end_at ? new Date(a.end_at).setHours(0, 0, 0, 0) : startMs;
+                    const isSingleDay = (endMs - startMs) <= 86400000;
+                    return {
+                        id: a.id,
+                        title: a.outlet_name || a.title,
+                        start: isSingleDay ? new Date(a.start_at).toISOString().slice(0, 10) : a.start_at,
+                        end: isSingleDay ? new Date(new Date(a.start_at).setDate(new Date(a.start_at).getDate() + 1)).toISOString().slice(0, 10) : a.end_at,
+                        allDay: isSingleDay,
+                        display: 'block',
+                        backgroundColor: '#4CAF50',
+                        borderColor: 'transparent',
+                        textColor: '#FFF',
+                        extendedProps: {
+                            isVisit: false,
+                            isSingleDay: isSingleDay,
+                            originalStart: a.start_at,
+                            originalEnd: a.end_at,
+                            dbId: a.id,
+                            description: a.description,
+                            outletName: a.outlet_name || a.title,
+                            location: a.location,
+                            remindMinutes: a.remind_minutes
+                        }
+                    };
+                });
+
+                // 2. Auto events from "Schedule Next Visit" in saved visits
+                const visitEvents = (AppState.visits || [])
+                    .filter(v => v.next_visit_date)
+                    .map(v => {
+                        const startDate = new Date(v.next_visit_date).toISOString().slice(0, 10);
+                        const endDate = new Date(new Date(v.next_visit_date).setDate(new Date(v.next_visit_date).getDate() + 1)).toISOString().slice(0, 10);
+                        return {
+                            id: 'visit_' + v.id,
+                            title: v.outlet,
+                            start: startDate,
+                            end: endDate,
+                            allDay: true,
+                            display: 'block',
+                            backgroundColor: '#E53935',
+                            borderColor: 'transparent',
+                            textColor: '#FFF',
+                            editable: false,
+                            extendedProps: { isVisit: true, visitId: v.id, outletName: v.outlet }
+                        };
+                    });
+
+                successCallback([...aptEvents, ...visitEvents]);
+            } catch (err) {
+                console.error('Calendar fetch error:', err);
+                failureCallback(err);
+            }
+        },
+
+        eventClick: function (info) {
+            const ep = info.event.extendedProps;
+            if (ep.isVisit) {
+                window.openDetail(ep.visitId || info.event.id.replace('visit_', ''));
+            } else {
+                window.showAppointmentReadOnly(info.event.id);
+            }
+        },
+
+    });
+    AppState.calendarObj.render();
+};
+
+// ============================================================
+// APPOINTMENT READ-ONLY VIEW
+// ============================================================
+
+window.showAppointmentReadOnly = function (eventId) {
+    if (!AppState.calendarObj) return;
+    const event = AppState.calendarObj.getEventById(eventId);
+    if (!event) return;
+
+    const ep = event.extendedProps;
+    // Use original timestamps if event was converted to allDay for display
+    const startD = ep.originalStart ? new Date(ep.originalStart) : event.start;
+    const endD = ep.originalEnd ? new Date(ep.originalEnd) : event.end;
+    const pad = n => String(n).padStart(2, '0');
+
+    const startDateStr = fmtDate(startD.toISOString());
+    const startTimeStr = `${pad(startD.getHours())}:${pad(startD.getMinutes())}`;
+
+    let dateDisplay = '';
+
+    if (endD) {
+        const endDateStr = fmtDate(endD.toISOString());
+        const endTimeStr = `${pad(endD.getHours())}:${pad(endD.getMinutes())}`;
+
+        if (startDateStr === endDateStr) {
+            dateDisplay = `${startDateStr} <br> <span style="color:var(--primary); margin-top: 4px; display: inline-block;">${startTimeStr} - ${endTimeStr}</span>`;
+        } else {
+            dateDisplay = `${startDateStr} (${startTimeStr}) <br> <span style="color:var(--primary); margin-top: 4px; display: inline-block;">to ${endDateStr} (${endTimeStr})</span>`;
+        }
+    } else {
+        dateDisplay = `${startDateStr} <br> <span style="color:var(--primary); margin-top: 4px; display: inline-block;">Start: ${startTimeStr}</span>`;
+    }
+
+    let remindText = 'No reminder';
+    if (ep.remindMinutes > 0) {
+        if (ep.remindMinutes >= 1440) remindText = `1 day`;
+        else if (ep.remindMinutes >= 60) remindText = `${ep.remindMinutes / 60} hr`;
+        else remindText = `${ep.remindMinutes} min`;
+    }
+
+    const html = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+                <div class="detail-label" style="margin-bottom: 4px;">SCHEDULED VISIT</div>
+                <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main); margin: 0; line-height: 1.3;">${esc(event.title)}</h2>
+            </div>
+        </div>
+        
+        <div class="detail-field">
+            <span class="detail-label">Date & Time</span>
+            <span class="detail-value" style="background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); margin-top: 6px; display: block; font-weight: 500;">
+                ${dateDisplay}
+            </span>
+        </div>
+
+        <div class="detail-field">
+            <span class="detail-label">Remind Before</span>
+            <span class="detail-value" style="background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); margin-top: 6px; display: block;">
+                ${remindText}
+            </span>
+        </div>
+
+        ${ep.description ? `
+        <div class="detail-field">
+            <span class="detail-label">Note</span>
+            <span class="detail-value" style="background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); margin-top: 6px; display: block; white-space: pre-wrap;">${esc(ep.description)}</span>
+        </div>
+        ` : ''}
+
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-light); display: flex; gap: 10px;">
+            <button class="btn-secondary" onclick="window.closeDetail()" style="flex: 1;">Close</button>
+            <button class="btn-primary" onclick="window.triggerEditAppointment('${event.id}')" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Edit
+            </button>
+        </div>
+    `;
+    document.getElementById('detail-content').innerHTML = html;
+    document.getElementById('detail-overlay').classList.add('open');
+}
+
+window.triggerEditAppointment = function (eventId) {
+    window.closeDetail();
+    if (!AppState.calendarObj) return;
+    const event = AppState.calendarObj.getEventById(eventId);
+    if (event) {
+        setTimeout(() => {
+            window.openAppointmentDetail(event);
+        }, 150);
+    }
+}
+
+window.updateCalendarEvents = function () {
+    if (AppState.calendarObj) AppState.calendarObj.refetchEvents();
+};
+
+// ============================================================
+// APPOINTMENT MODAL — เปิดสร้างใหม่ (รองรับ 2 DatePickers)
+// ============================================================
+window.openAppointmentModal = function (start, end, allDay) {
+    AppState.editingAptId = null;
+
+    document.getElementById('apt-modal-title').textContent = 'Schedule Visit';
+    document.getElementById('btn-apt-delete').style.display = 'none';
+    document.getElementById('apt-note').value = '';
+
+    const d = start ? new Date(start) : new Date();
+    let endD = null; // เริ่มต้นให้วันจบเป็นค่าว่าง (ไม่บังคับ)
+
+    if (allDay) {
+        const diffDays = (end.getTime() - start.getTime()) / (1000 * 3600 * 24);
+        if (diffDays > 1) {
+            endD = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+            d.setHours(9, 0, 0);
+            endD.setHours(17, 0, 0);
+        } else {
+            d.setHours(9, 0, 0);
+        }
+    } else {
+        const diffMins = (end.getTime() - start.getTime()) / (1000 * 60);
+        if (diffMins > 30) {
+            endD = new Date(end);
+        }
+    }
+
+    const startInput = document.getElementById('apt-start-date');
+    const endInput = document.getElementById('apt-end-date');
+
+    if (!startInput || !endInput) {
+        alert('Missing HTML IDs: apt-start-date or apt-end-date.');
+        if (AppState.calendarObj) AppState.calendarObj.unselect();
+        return;
+    }
+
+    if (!window._aptStartDatePicker) {
+        window._aptStartDatePicker = flatpickr(startInput, { altInput: true, altFormat: 'd M Y', dateFormat: 'Y-m-d' });
+        window._aptEndDatePicker = flatpickr(endInput, { altInput: true, altFormat: 'd M Y', dateFormat: 'Y-m-d' });
+    }
+
+    window._aptStartDatePicker.setDate(d, true);
+
+    if (endD) {
+        window._aptEndDatePicker.setDate(endD, true);
+    } else {
+        window._aptEndDatePicker.clear();
+    }
+
+    const pad = n => String(n).padStart(2, '0');
+
+    const startH = pad(d.getHours());
+    const startM = ['00', '15', '30', '45'].reduce((prev, curr) =>
+        Math.abs(parseInt(curr) - d.getMinutes()) < Math.abs(parseInt(prev) - d.getMinutes()) ? curr : prev);
+    document.getElementById('apt-hour').value = startH;
+    document.getElementById('apt-minute').value = startM;
+
+    const fallbackEnd = endD || new Date(d.getTime() + 3600000);
+    const endH = pad(Math.min(23, fallbackEnd.getHours()));
+    const endM = ['00', '15', '30', '45'].reduce((prev, curr) =>
+        Math.abs(parseInt(curr) - fallbackEnd.getMinutes()) < Math.abs(parseInt(prev) - fallbackEnd.getMinutes()) ? curr : prev);
+    document.getElementById('apt-end-hour').value = endH;
+    document.getElementById('apt-end-minute').value = endM;
+
+    document.getElementById('apt-remind-select').value = '30';
+    const outletSel = document.getElementById('apt-outlet-select');
+    if (outletSel?._tomSelect) outletSel._tomSelect.clear();
+
+    loadAptOutlets();
+    document.getElementById('appointment-modal').classList.add('open');
+};
+
+// ============================================================
+// APPOINTMENT MODAL — เปิดแก้ไข (รองรับ 2 DatePickers)
+// ============================================================
+window.openAppointmentDetail = function (event) {
+    const ep = event.extendedProps;
+    AppState.editingAptId = ep.dbId;
+
+    document.getElementById('apt-modal-title').textContent = 'Edit Visit';
+    document.getElementById('btn-apt-delete').style.display = 'inline-flex';
+    document.getElementById('apt-note').value = ep.description || '';
+
+    // Use original timestamps if event was converted to allDay for display
+    const d = ep.originalStart ? new Date(ep.originalStart) : (event.start || new Date());
+    let endD = ep.originalEnd ? new Date(ep.originalEnd) : (event.end ? new Date(event.end) : new Date(d.getTime() + 3600000));
+
+    if (event.allDay && event.end) {
+        endD = new Date(event.end.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    if (!window._aptStartDatePicker) {
+        window._aptStartDatePicker = flatpickr('#apt-start-date', {
+            altInput: true, altFormat: 'd M Y', dateFormat: 'Y-m-d'
+        });
+        window._aptEndDatePicker = flatpickr('#apt-end-date', {
+            altInput: true, altFormat: 'd M Y', dateFormat: 'Y-m-d'
+        });
+    }
+    window._aptStartDatePicker.setDate(d, true);
+    window._aptEndDatePicker.setDate(endD, true);
+
+    const pad = n => String(n).padStart(2, '0');
+
+    document.getElementById('apt-hour').value = pad(d.getHours());
+    document.getElementById('apt-minute').value = ['00', '15', '30', '45'].reduce((prev, curr) =>
+        Math.abs(parseInt(curr) - d.getMinutes()) < Math.abs(parseInt(prev) - d.getMinutes()) ? curr : prev);
+
+    document.getElementById('apt-end-hour').value = pad(Math.min(23, endD.getHours()));
+    document.getElementById('apt-end-minute').value = ['00', '15', '30', '45'].reduce((prev, curr) =>
+        Math.abs(parseInt(curr) - endD.getMinutes()) < Math.abs(parseInt(prev) - endD.getMinutes()) ? curr : prev);
+
+    const remindVal = ep.remindMinutes !== undefined ? ep.remindMinutes : 30;
+    const remindSel = document.getElementById('apt-remind-select');
+    if (remindSel) remindSel.value = String(remindVal);
+
+    loadAptOutlets(ep.outletName || ep.location || '');
+    document.getElementById('appointment-modal').classList.add('open');
+};
+
+// ============================================================
+// SAVE / UPDATE (บันทึกข้ามวันได้)
+// ============================================================
+window.saveAppointment = async function () {
+    const outletSel = document.getElementById('apt-outlet-select');
+    const ts = outletSel?._tomSelect;
+    const outletId = ts ? ts.getValue() : (outletSel?.value || '');
+    const outletName = ts?.options[outletId]?.text || outletId || '';
+    if (!outletId) { toast('Please select an outlet.', false); return; }
+
+    const startDateVal = window._aptStartDatePicker?.input?.value || document.getElementById('apt-start-date').value;
+    const endDateVal = window._aptEndDatePicker?.input?.value || document.getElementById('apt-end-date').value;
+
+    if (!startDateVal) { toast('Please select a start date.', false); return; }
+
+    const h = document.getElementById('apt-hour').value;
+    const m = document.getElementById('apt-minute').value;
+    const startDt = new Date(`${startDateVal}T${h}:${m}:00`);
+
+    // FIX: ใช้ startDate เป็นค่าสำรอง ถ้าผู้ใช้ไม่ได้เลือก endDate
+    const targetEndDate = endDateVal ? endDateVal : startDateVal;
+
+    const eh = document.getElementById('apt-end-hour').value;
+    const em = document.getElementById('apt-end-minute').value;
+    const endDt = new Date(`${targetEndDate}T${eh}:${em}:00`);
+
+    if (endDt <= startDt) {
+        toast('End date/time must be after the start.', false);
+        return;
+    }
+
+    const payload = {
+        title: outletName,
+        description: document.getElementById('apt-note').value.trim() || null,
+        location: outletId,
+        outlet_name: outletName,
+        color: '#4CAF50',
+        type: 'visit',
+        remindMinutes: parseInt(document.getElementById('apt-remind-select')?.value || '30'),
+        start: startDt.toISOString(),
+        end: endDt.toISOString(), // ตรงนี้จะไม่เป็น null อีกต่อไป
+        allDay: false
+    };
+
+    const btn = document.getElementById('btn-apt-save');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    try {
+        if (AppState.editingAptId) {
+            await CalendarDB.update(AppState.editingAptId, payload);
+            toast('Updated.', true);
+        } else {
+            await CalendarDB.create(payload);
+            toast('Visit scheduled.', true);
+        }
+        document.getElementById('appointment-modal').classList.remove('open');
+        if (AppState.calendarObj) AppState.calendarObj.refetchEvents();
+    } catch (e) {
+        toast('Error: ' + e.message, false);
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save';
+    }
+};
+
+// ============================================================
+// DELETE
+// ============================================================
+window.deleteAppointment = async function () {
+    if (!AppState.editingAptId) return;
+    if (!confirm('Delete this appointment?')) return;
+    try {
+        await CalendarDB.delete(AppState.editingAptId);
+        document.getElementById('appointment-modal').classList.remove('open');
+        if (AppState.calendarObj) AppState.calendarObj.refetchEvents();
+        toast('Appointment deleted.', true);
+    } catch (e) {
+        toast('Failed to delete: ' + e.message, false);
+    }
+};
+
+// ============================================================
+// HELPER
+// ============================================================
+function _fmtDTDisplay(isoStr) {
+    if (!isoStr) return '';
+    try {
+        const d = new Date(isoStr);
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const pad = n => String(n).padStart(2, '0');
+        return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return isoStr; }
+}
+
+// ============================================================
+// APPOINTMENT MODAL UI HELPERS (ระบบปรับเวลาอัตโนมัติ)
+// ============================================================
+window.autoSetEndTime = function () {
+    const startVal = document.getElementById('apt-start-date')?.value;
+    const endVal = document.getElementById('apt-end-date')?.value;
+
+    // ข้ามการคำนวณปรับเวลาอัตโนมัติ ถ้านัดหมายข้ามวัน (ป้องกันการเด้งเปลี่ยนเวลาเอง)
+    if (startVal && endVal && startVal !== endVal) return;
+
+    const sh = parseInt(document.getElementById('apt-hour').value || '9');
+    const sm = parseInt(document.getElementById('apt-minute').value || '0');
+    const endH = document.getElementById('apt-end-hour');
+    const endM = document.getElementById('apt-end-minute');
+    if (!endH || !endM) return;
+
+    const curEH = parseInt(endH.value || '10');
+    const curEM = parseInt(endM.value || '0');
+
+    if (curEH * 60 + curEM <= sh * 60 + sm) {
+        const newH = Math.min(23, sh + 1);
+        endH.value = String(newH).padStart(2, '0');
+        endM.value = String(sm).padStart(2, '0');
+    }
+};
+
+window.selectAptType = function (el, type) {
+    document.querySelectorAll('.apt-type-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('apt-type').value = type;
+    _toggleAptLocationUI(type);
+};
+
+function _toggleAptLocationUI(type) {
+    const locationWrap = document.getElementById('apt-location-wrap');
+    const outletWrap = document.getElementById('apt-outlet-wrap');
+    if (!locationWrap || !outletWrap) return;
+    if (type === 'visit') {
+        locationWrap.style.display = 'none';
+        outletWrap.style.display = 'flex';
+        loadAptOutlets();
+    } else {
+        locationWrap.style.display = '';
+        outletWrap.style.display = 'none';
+    }
+}
+
+async function loadAptOutlets(selectValue) {
+    const selectEl = document.getElementById('apt-outlet-select');
+    if (!selectEl) return;
+
+    if (selectEl._tomSelect && !selectValue) { return; }
+    if (selectEl._tomSelect && selectValue) {
+        selectEl._tomSelect.setValue(selectValue, true);
+        return;
+    }
+
+    try {
+        const team = (AppState.userProfile.team || '').trim().toLowerCase();
+        const isAdmin = team === 'admin';
+        const empId = AppState.userProfile.empId;
+        const bdeName = AppState.userProfile.name;
+
+        let params = `select=customer_id,name_of_outlet&status=neq.INACTIVE&order=name_of_outlet.asc`;
+        if (!isAdmin) {
+            if (empId && bdeName)
+                params += `&or=(user_id.eq.${encodeURIComponent(empId)},bde.eq.${encodeURIComponent(bdeName)})`;
+            else if (empId) params += `&user_id=eq.${encodeURIComponent(empId)}`;
+            else if (bdeName) params += `&bde=eq.${encodeURIComponent(bdeName)}`;
+        }
+
+        const data = await DB.select('customer_information', params);
+        const options = (data || []).map(c => ({
+            value: c.customer_id,
+            text: c.name_of_outlet,
+            searchText: `${c.customer_id} ${c.name_of_outlet}`,
+            outletName: c.name_of_outlet
+        }));
+
+        if (selectEl._tomSelect) selectEl._tomSelect.destroy();
+
+        const ts = new TomSelect(selectEl, {
+            options: options,
+            items: selectValue ? [selectValue] : [],
+            valueField: 'value',
+            labelField: 'text',
+            searchField: ['text', 'searchText'],
+            sortField: { field: 'text', direction: 'asc' },
+            placeholder: 'Search outlet...',
+            allowEmptyOption: true,
+            maxOptions: 500,
+            maxItems: 1,
+            plugins: ['clear_button'],
+            render: {
+                option: function (item, escape) {
+                    return `<div><span style="color:var(--text-muted);font-size:11px;margin-right:6px;">${escape(item.value)}</span>${escape(item.text)}</div>`;
+                },
+                item: function (item, escape) {
+                    return `<div>${escape(item.text)}</div>`;
+                }
+            }
+        });
+        selectEl._tomSelect = ts;
+    } catch (e) {
+        console.error('loadAptOutlets error:', e);
+    }
+}
+
+window.selectAptColor = function (el, color) {
+    document.querySelectorAll('.apt-swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('apt-color').value = color;
+};
+
+// ============================================================
+// I18N — FULL-SITE LANGUAGE SWITCHER (EN / TH)
+// ============================================================
+AppState.currentLang = 'en';
+
+const I18N = {
+    en: {
+        // Sidebar nav
+        nav_new_visit: 'New Visit',
+        nav_all_visits: 'All Visits',
+        nav_calendar: 'Calendar',
+        dark_mode: 'Dark Mode',
+        light_mode: 'Light Mode',
+        // Login
+        sign_in: 'Sign In',
+        username: 'Username',
+        password: 'Password',
+        remember_me: 'Remember me',
+        submit: 'SUBMIT',
+        // Header
+        records: 'records',
+        notifications: 'Notifications',
+        clear_all: 'Clear all',
+        // Profile
+        team: 'Team',
+        area: 'Area',
+        email: 'Email',
+        contact: 'Contact',
+        logout: 'Logout',
+        // Visit form
+        visit_info: 'Visit Information',
+        customer_outlet: 'Customer / Outlet',
+        person_met: 'Person You Met',
+        their_position: 'Their Position',
+        specify_pos: 'Specify Position',
+        visit_date: 'Visit Date',
+        reason_visit: 'Reason for Visit',
+        result_visit: 'Result of Visit',
+        followup: 'Follow-up Actions',
+        followup_quotation: 'Send Quotation/Docs',
+        followup_callback: ' Call Back Later',
+        followup_schedule: 'Schedule Next Visit',
+        select_next_date: 'Select Date for Next Visit:',
+        live_evidence: 'Live Evidence',
+        capture_hint: 'Capture or select up to 10 photos',
+        captured_photos: 'Captured Photos (Click to view)',
+        clear: 'Clear',
+        save_visit: 'Save Visit',
+        // Filters
+        all_areas: 'All areas',
+        all_positions: 'All positions',
+        filter_by_date: 'Filter by date',
+        search_outlet: 'Search outlet...',
+        type_search_pos: 'Type to search position...',
+        // Calendar legend
+        legend_scheduled: 'Scheduled',
+        legend_visit_rec: 'From visit record',
+        schedule_visit: 'Schedule Visit',
+        // Modals
+        review_visit: 'Review Visit Details',
+        edit: 'Edit',
+        confirm_save: 'Confirm & Save',
+        delete_request: 'Delete Request',
+        delete_reason: 'Reason for delete request:',
+        cancel: 'Cancel',
+        confirm_delete: 'Confirm Delete',
+        save: 'Save',
+        delete: 'Delete',
+        remind_before: 'Remind before',
+        no_reminder: 'No reminder',
+        // Apt modal fields
+        start_date: 'Start date',
+        end_date: 'End date (optional)',
+        note_optional: 'Note (optional)',
+        // Calendar buttons
+        _fc_today: 'Today',
+        _fc_month: 'Month',
+        _fc_week: 'Week',
+        _fc_day: 'Day',
+        _fc_list: 'List',
+    },
+    th: {
+        // Sidebar nav
+        nav_new_visit: 'บันทึกการเยี่ยม',
+        nav_all_visits: 'ประวัติทั้งหมด',
+        nav_calendar: 'ปฏิทิน',
+        dark_mode: 'โหมดมืด',
+        light_mode: 'โหมดสว่าง',
+        // Login
+        sign_in: 'เข้าสู่ระบบ',
+        username: 'ชื่อผู้ใช้',
+        password: 'รหัสผ่าน',
+        remember_me: 'จดจำฉัน',
+        submit: 'เข้าสู่ระบบ',
+        // Header
+        records: 'รายการ',
+        notifications: 'การแจ้งเตือน',
+        clear_all: 'ล้างทั้งหมด',
+        // Profile
+        team: 'ทีม',
+        area: 'พื้นที่',
+        email: 'อีเมล',
+        contact: 'ติดต่อ',
+        logout: 'ออกจากระบบ',
+        // Visit form
+        visit_info: 'ข้อมูลการเยี่ยม',
+        customer_outlet: 'ลูกค้า / สาขา',
+        person_met: 'ผู้ที่พบ',
+        their_position: 'ตำแหน่ง',
+        specify_pos: 'ระบุตำแหน่ง',
+        visit_date: 'วันที่เยี่ยม',
+        reason_visit: 'วัตถุประสงค์',
+        result_visit: 'ผลการเยี่ยม',
+        followup: 'การติดตาม',
+        followup_quotation: 'ส่งใบเสนอราคา/เอกสาร',
+        followup_callback: ' โทรกลับภายหลัง',
+        followup_schedule: 'นัดหมายเยี่ยมครั้งต่อไป',
+        select_next_date: 'เลือกวันนัดหมายครั้งถัดไป:',
+        live_evidence: 'หลักฐานสด',
+        capture_hint: 'ถ่ายหรือเลือกสูงสุด 10 รูป',
+        captured_photos: 'รูปถ่าย (กดเพื่อดู)',
+        clear: 'ล้างข้อมูล',
+        save_visit: 'บันทึก',
+        // Filters
+        all_areas: 'ทุกพื้นที่',
+        all_positions: 'ทุกตำแหน่ง',
+        filter_by_date: 'กรองตามวันที่',
+        search_outlet: 'ค้นหาสาขาหรือหมายเหตุ...',
+        type_search_pos: 'พิมพ์เพื่อค้นหาตำแหน่ง...',
+        // Calendar legend
+        legend_scheduled: 'นัดหมาย',
+        legend_visit_rec: 'จากการเยี่ยม',
+        schedule_visit: 'นัดหมายเยี่ยม',
+        // Modals
+        review_visit: 'ตรวจสอบข้อมูล',
+        edit: 'แก้ไข',
+        confirm_save: 'ยืนยันและบันทึก',
+        delete_request: 'ขอลบรายการ',
+        delete_reason: 'เหตุผลในการลบ:',
+        cancel: 'ยกเลิก',
+        confirm_delete: 'ยืนยันการลบ',
+        save: 'บันทึก',
+        delete: 'ลบ',
+        remind_before: 'แจ้งเตือนก่อน',
+        no_reminder: 'ไม่แจ้งเตือน',
+        // Apt modal fields
+        start_date: 'วันเริ่มต้น',
+        end_date: 'วันสิ้นสุด (ไม่บังคับ)',
+        note_optional: 'หมายเหตุ (ไม่บังคับ)',
+        // Calendar buttons
+        _fc_today: 'วันนี้',
+        _fc_month: 'เดือน',
+        _fc_week: 'สัปดาห์',
+        _fc_day: 'วัน',
+        _fc_list: 'รายการ',
+    }
+};
+
+window.toggleCalendarLang = function () {
+    const newLang = AppState.currentLang === 'en' ? 'th' : 'en';
+    AppState.currentLang = newLang;
+    _applyLang(newLang);
+};
+
+function _applyLang(lang) {
+    const dict = I18N[lang];
+    if (!dict) return;
+
+    // --- Toggle button label (show language you'll switch TO) ---
+    const label = document.getElementById('lang-toggle-label');
+    if (label) label.textContent = lang === 'en' ? 'TH' : 'EN';
+
+    // --- Apply all [data-i18n] text nodes ---
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key] !== undefined) el.textContent = dict[key];
+    });
+
+    // --- Apply [data-i18n-placeholder] placeholders ---
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (dict[key] !== undefined) el.placeholder = dict[key];
+    });
+
+    // --- Inputs without data-i18n-placeholder (use id map) ---
+    const phMap = {
+        'f-person': lang === 'en' ? 'Full name' : 'ชื่อ-นามสกุล',
+        'f-pos-other': lang === 'en' ? 'Enter position' : 'ระบุตำแหน่ง',
+        'f-date': lang === 'en' ? 'Select Date' : 'เลือกวันที่',
+        'f-reason': lang === 'en' ? 'Purpose of this visit...' : 'วัตถุประสงค์การเยี่ยม...',
+        'f-result': lang === 'en' ? 'Outcomes, agreements, follow-ups...' : 'ผลลัพธ์, ข้อตกลง, การติดตาม...',
+        'f-next-date': lang === 'en' ? 'Select Date' : 'เลือกวันที่',
+        'fl-date': lang === 'en' ? 'Filter by date' : 'กรองตามวันที่',
+        'fl-pos-other': lang === 'en' ? 'Type to search position...' : 'พิมพ์เพื่อค้นหาตำแหน่ง...',
+        'fl-search': lang === 'en' ? 'Search outlet...' : 'ค้นหาสาขาหรือหมายเหตุ...',
+        'delete-reason-input': lang === 'en' ? 'e.g., Duplicated entry...' : 'เช่น รายการซ้ำ...',
+    };
+    for (const [id, ph] of Object.entries(phMap)) {
+        const el = document.getElementById(id);
+        if (el) el.placeholder = ph;
+    }
+
+    // --- Select option[0] text (filter dropdowns) ---
+    const flArea = document.getElementById('fl-area');
+    if (flArea && flArea.options[0]) flArea.options[0].text = dict.all_areas;
+    const flPos = document.getElementById('fl-pos');
+    if (flPos && flPos.options[0]) flPos.options[0].text = dict.all_positions;
+
+    // --- Remind select options ---
+    const remindSel = document.getElementById('apt-remind-select');
+    if (remindSel) {
+        const opts = lang === 'en'
+            ? ['No reminder', '15 min', '30 min', '1 hour', '1 day']
+            : ['ไม่แจ้งเตือน', '15 นาที', '30 นาที', '1 ชั่วโมง', '1 วัน'];
+        Array.from(remindSel.options).forEach((o, i) => { if (opts[i]) o.text = opts[i]; });
+    }
+
+    // --- Update page title to match active tab + current lang ---
+    const pageTitleEl = document.getElementById('page-title');
+    if (pageTitleEl) {
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+            const span = activeTab.querySelector('[data-i18n]');
+            if (span) {
+                const titleMap = {
+                    nav_new_visit: { en: 'New Visit', th: 'บันทึกการเยี่ยม' },
+                    nav_all_visits: { en: 'All Visits', th: 'ประวัติทั้งหมด' },
+                    nav_calendar: { en: 'Calendar Schedule', th: 'ปฏิทินนัดหมาย' }
+                };
+                const key = span.getAttribute('data-i18n');
+                if (titleMap[key]) pageTitleEl.textContent = titleMap[key][lang] || titleMap[key].en;
+            }
+        }
+    }
+
+    // --- FullCalendar locale ---
+    if (AppState.calendarObj) {
+        AppState.calendarObj.setOption('locale', lang);
+        AppState.calendarObj.setOption('buttonText', {
+            today: dict._fc_today,
+            month: dict._fc_month,
+            week: dict._fc_week,
+            day: dict._fc_day,
+            list: dict._fc_list,
+        });
+    }
+
+    // --- Save preference ---
+    try { localStorage.setItem('visitation_lang', lang); } catch (e) { }
+}
+
+// Auto-load saved language on startup
+(function initLang() {
+    try {
+        const saved = localStorage.getItem('visitation_lang') || 'en';
+        AppState.currentLang = saved;
+        if (saved !== 'en') {
+            // Wait for DOM to be ready
+            const apply = () => _applyLang(saved);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', apply);
+            } else {
+                setTimeout(apply, 400);
+            }
+        }
+    } catch (e) { }
+})();
