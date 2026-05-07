@@ -12,40 +12,65 @@
 
     /* โทนสีหลัก: สีแดงพรีเมียม */
     --primary: #D32F2F;
-    /* สีแดง */
     --primary-hover: #B71C1C;
-    /* สีแดงเข้มเวลาเอาเมาส์ชี้ */
-    --focus-ring: rgba(211, 47, 47, 0.25);
+    --primary-light: rgba(211, 47, 47, 0.08);
+    --focus-ring: rgba(211, 47, 47, 0.2);
 
     --danger: #FF5252;
-    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
+    --success: #2E7D32;
+    --warning: #F57C00;
+
+    /* Shadows — layered for depth */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 8px rgba(0,0,0,0.06), 0 12px 28px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,0.08), 0 24px 48px rgba(0,0,0,0.12);
+    --shadow-red: 0 4px 16px rgba(211, 47, 47, 0.28);
+
+    /* Spacing scale */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
+
+    --radius-xs: 3px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+
+    /* Transitions */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --t-fast: 120ms;
+    --t-base: 200ms;
+    --t-slow: 320ms;
 
     /* ตัวแปรสีสำหรับหน้า Login */
     --alchemy-bg: #111111;
-    --alchemy-btn: #000000;
-    --alchemy-input-bg: #F4F4F4;
+    --alchemy-btn: #111111;
+    --alchemy-input-bg: #F2F2F2;
 }
 
 body.dark-mode {
-    --bg-color: #111111;
-    /* สีดำพรีเมียม */
-    --card-bg: #1A1A1A;
-    /* สีเทาเข้ม */
-    --text-main: #F4F4F4;
-    --text-muted: #999999;
-    --border-light: #333333;
+    --bg-color: #0E0E0E;
+    --card-bg: #181818;
+    --text-main: #F0F0F0;
+    --text-muted: #888888;
+    --border-light: #2A2A2A;
 
-    /* สีแดงในโหมดมืด (ปรับให้สว่างขึ้นนิดหน่อยเพื่อให้ตัดกับพื้นดำ) */
-    --primary: #E53935;
+    --primary: #EF5350;
     --primary-hover: #F44336;
-    --focus-ring: rgba(229, 57, 53, 0.25);
+    --primary-light: rgba(239, 83, 80, 0.1);
+    --focus-ring: rgba(239, 83, 80, 0.22);
 
-    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 8px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.35);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,0.5), 0 24px 48px rgba(0,0,0,0.4);
+    --shadow-red: 0 4px 16px rgba(239, 83, 80, 0.35);
 }
 
 * {
@@ -81,26 +106,28 @@ body {
 }
 
 .sidebar {
-    width: 260px;
+    width: 256px;
     background: var(--card-bg);
     border-right: 1px solid var(--border-light);
     display: flex;
     flex-direction: column;
-    padding: 1.5rem;
+    padding: 1.5rem 1rem;
     position: fixed;
     height: 100vh;
     left: 0;
     top: 0;
     z-index: 90;
     box-shadow: var(--shadow-sm);
+    transition: transform var(--t-slow) var(--ease-out);
 }
 
 .sidebar-header h1 {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 800;
     color: var(--primary);
     margin-bottom: 2rem;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.6px;
+    padding: 0 var(--sp-2);
 }
 
 .sidebar-nav.tabs {
@@ -108,30 +135,43 @@ body {
     background: transparent;
     padding: 0;
     margin-bottom: 0;
-    gap: 8px;
+    gap: var(--sp-1);
 }
 
 .sidebar-nav .tab {
     text-align: left;
-    padding: 12px 16px;
+    padding: 10px 14px;
     display: flex;
     align-items: center;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     font-weight: 500;
-    font-size: 15px;
+    font-size: 14px;
+    color: var(--text-muted);
+    transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
+    cursor: pointer;
+    user-select: none;
 }
 
 .sidebar-nav .tab:hover {
-    background: rgba(211, 47, 47, 0.1);
-    /* สีแดงอ่อนเวลานำเมาส์ชี้ */
+    background: var(--primary-light);
     color: var(--primary);
+    transform: translateX(2px);
+}
+
+.sidebar-nav .tab:active {
+    transform: translateX(1px) scale(0.99);
 }
 
 .sidebar-nav .tab.active {
     background: var(--primary);
     color: #FFF;
     font-weight: 600;
-    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.2);
+    box-shadow: var(--shadow-red);
+}
+
+.sidebar-nav .tab.active:hover {
+    background: var(--primary-hover);
+    transform: translateX(0);
 }
 
 body.dark-mode .sidebar-nav .tab.active {
@@ -140,13 +180,74 @@ body.dark-mode .sidebar-nav .tab.active {
 
 .app-main {
     flex: 1;
-    margin-left: 260px;
-    padding: 2rem 3rem;
+    margin-left: 256px;
+    padding: 2rem 2.5rem;
     max-width: 1200px;
 }
 
 .app-main .header {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.75rem;
+}
+
+/* =========================================
+   Sidebar Footer — Dark Mode Toggle
+   ========================================= */
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+}
+
+.sidebar-theme-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
+    text-align: left;
+}
+
+.sidebar-theme-btn:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+    transform: translateX(2px);
+}
+
+.sidebar-theme-btn:active {
+    transform: scale(0.98);
+}
+
+.sidebar-theme-label {
+    flex: 1;
+}
+
+/* label toggle ตาม mode */
+body:not(.dark-mode) .sidebar-theme-btn .light-label {
+    display: inline;
+}
+
+body:not(.dark-mode) .sidebar-theme-btn .dark-label {
+    display: none;
+}
+
+body.dark-mode .sidebar-theme-btn .light-label {
+    display: none;
+}
+
+body.dark-mode .sidebar-theme-btn .dark-label {
+    display: inline;
 }
 
 /* =========================================
@@ -174,13 +275,13 @@ body.dark-mode .sidebar-nav .tab.active {
     }
 
     .sidebar {
-        width: 260px;
+        width: 256px;
         height: 100vh;
         position: fixed;
         left: 0;
         top: 0;
         transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform var(--t-slow) var(--ease-out);
         z-index: 9999;
         border-right: 1px solid var(--border-light);
     }
@@ -192,7 +293,7 @@ body.dark-mode .sidebar-nav .tab.active {
     .app-main {
         margin-left: 0;
         width: 100%;
-        padding: 1.5rem 1rem;
+        padding: 1.25rem 1rem;
     }
 
     .hamburger-btn {
@@ -204,58 +305,88 @@ body.dark-mode .sidebar-nav .tab.active {
    Legacy Component Styles 
    ========================================= */
 
+/* Tab content fade-in animation */
+#tab-new,
+#tab-list,
+#tab-calendar {
+    animation: none;
+}
+
+#tab-new.tab-enter,
+#tab-list.tab-enter,
+#tab-calendar.tab-enter {
+    animation: tabFadeIn var(--t-slow) var(--ease-out) both;
+}
+
+@keyframes tabFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 2rem;
+    margin-bottom: 1.75rem;
 }
 
 .header h2 {
     font-size: 22px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: -0.5px;
+    color: var(--text-main);
+    line-height: 1.2;
 }
 
 .header .rec-badge {
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 600;
     color: var(--text-muted);
     background: var(--card-bg);
-    padding: 6px 14px;
-    border-radius: 24px;
+    padding: 5px 12px;
+    border-radius: 20px;
     border: 1px solid var(--border-light);
+    letter-spacing: 0.02em;
 }
 
 .card {
     background: var(--card-bg);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
-    padding: 1.75rem;
-    margin-bottom: 1.25rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
     box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--t-base);
 }
 
 .section-title {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 1.25rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
     display: flex;
     justify-content: space-between;
+    align-items: center;
 }
 
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: var(--sp-4);
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--sp-1);
 }
 
 .form-group.full {
@@ -263,9 +394,11 @@ body.dark-mode .sidebar-nav .tab.active {
 }
 
 label {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
 
 label .req {
@@ -280,14 +413,15 @@ input[type=password],
 select,
 textarea {
     width: 100%;
-    padding: 10px 14px;
+    padding: 10px 13px;
     font-size: 14px;
-    border: 1px solid var(--border-light);
+    border: 1.5px solid var(--border-light);
     border-radius: var(--radius-sm);
     background: var(--bg-color);
     color: var(--text-main);
     outline: none;
-    transition: 0.2s;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+    font-family: inherit;
 }
 
 input:focus,
@@ -331,36 +465,59 @@ textarea {
 }
 
 .btn-primary {
-    padding: 12px 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    padding: 11px 22px;
     background: var(--primary);
     color: #FFF;
     border: none;
     border-radius: var(--radius-sm);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    transition: 0.2s;
+    transition: background var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
+    letter-spacing: 0.01em;
 }
 
 .btn-primary:hover {
     background: var(--primary-hover);
     transform: translateY(-1px);
+    box-shadow: var(--shadow-red);
+}
+
+.btn-primary:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: none;
 }
 
 .btn-secondary {
-    padding: 12px 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    padding: 11px 20px;
     background: var(--card-bg);
     color: var(--text-main);
-    border: 1px solid var(--border-light);
+    border: 1.5px solid var(--border-light);
     border-radius: var(--radius-sm);
     font-size: 14px;
+    font-family: inherit;
     cursor: pointer;
-    transition: 0.2s;
+    transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+    font-weight: 500;
 }
 
 .btn-secondary:hover {
     background: var(--bg-color);
-    border-color: #CCC;
+    border-color: #B0B0B0;
+    transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+    transform: scale(0.98);
 }
 
 .btn-danger {
@@ -696,18 +853,19 @@ textarea {
     top: 20px;
     right: 20px;
     color: #FFF;
-    padding: 12px 18px;
-    border-radius: var(--radius-sm);
+    padding: 12px 18px 12px 16px;
+    border-radius: var(--radius-md);
     font-size: 13px;
     font-weight: 500;
     display: none;
     z-index: 999999;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    max-width: 340px;
+    box-shadow: var(--shadow-lg);
+    max-width: 320px;
     min-width: 200px;
     line-height: 1.45;
     pointer-events: none;
-    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
+    border-left: 3px solid rgba(255,255,255,0.3);
+    backdrop-filter: blur(4px);
 }
 
 @media (max-width: 480px) {
@@ -718,13 +876,15 @@ textarea {
         left: 12px;
         max-width: none;
         text-align: center;
-        border-radius: 10px;
+        border-radius: var(--radius-md);
+        border-left: none;
+        border-bottom: 3px solid rgba(255,255,255,0.25);
     }
 }
 
 .toast.show {
     display: block;
-    animation: toastIn 0.25s ease forwards;
+    animation: toastIn 0.28s var(--ease-out) forwards;
 }
 
 .toast:not(.show) {
@@ -734,37 +894,43 @@ textarea {
 @keyframes toastIn {
     from {
         opacity: 0;
-        transform: translateY(-10px) scale(0.97);
+        transform: translateX(12px) scale(0.96);
     }
-
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translateX(0) scale(1);
     }
 }
 
 @keyframes toastOut {
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-    }
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.96); }
 }
 
 .visit-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--sp-3);
 }
 
 .visit-card {
     background: var(--card-bg);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-md);
-    padding: 1.25rem 1.5rem;
+    padding: 1.125rem 1.375rem;
     cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--t-base), transform var(--t-base), border-color var(--t-base);
+}
+
+.visit-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    border-color: rgba(211, 47, 47, 0.2);
+}
+
+.visit-card:active {
+    transform: scale(0.99);
     box-shadow: var(--shadow-sm);
 }
 
@@ -794,11 +960,12 @@ textarea {
     display: inline-flex;
     align-items: center;
     white-space: nowrap;
-    padding: 4px 12px;
+    padding: 3px 10px;
     border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     width: fit-content;
+    letter-spacing: 0.02em;
 }
 
 .tpl-status-badge .badge {
@@ -853,8 +1020,66 @@ textarea {
 
 .empty-state {
     text-align: center;
-    padding: 4rem 1rem;
+    padding: 4rem 1.5rem;
     color: var(--text-muted);
+    animation: tabFadeIn var(--t-slow) var(--ease-out) both;
+}
+
+.empty-state-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--sp-5);
+    color: var(--text-muted);
+}
+
+.empty-state-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: var(--sp-2);
+    letter-spacing: -0.2px;
+}
+
+.empty-state-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: var(--sp-6);
+    max-width: 260px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.empty-state-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 9px 18px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+
+.empty-state-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.empty-state-btn:active {
+    transform: scale(0.97);
 }
 
 .filters {
@@ -1090,7 +1315,6 @@ textarea {
 }
 
 #theme-toggle:hover {
-    border-color: var(--primary) !important;
     color: var(--primary) !important;
 }
 
@@ -1100,13 +1324,13 @@ textarea {
 
 .profile-dropdown {
     position: absolute;
-    top: calc(100% + 12px);
+    top: calc(100% + 10px);
     right: 0;
     left: auto;
     background: var(--card-bg);
-    width: 260px;
-    border-radius: 16px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+    width: 256px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05);
     border: 1px solid var(--border-light);
     display: none;
     flex-direction: column;
@@ -1116,16 +1340,15 @@ textarea {
 
 .profile-dropdown.show {
     display: flex;
-    animation: dropDownTopRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: dropDownTopRight 0.22s var(--ease-out) forwards;
     transform-origin: top right;
 }
 
 @keyframes dropDownTopRight {
     from {
         opacity: 0;
-        transform: translateY(-10px) scale(0.96);
+        transform: translateY(-8px) scale(0.95);
     }
-
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -1217,20 +1440,26 @@ textarea {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--sp-2);
     padding: 10px;
     background: transparent;
     color: var(--danger);
     font-size: 13px;
     font-weight: 600;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: 0.2s;
+    transition: background var(--t-fast), transform var(--t-fast);
+    font-family: inherit;
 }
 
 .btn-logout:hover {
-    background: #FEF8F8;
+    background: rgba(255, 82, 82, 0.08);
+    transform: none;
+}
+
+.btn-logout:active {
+    transform: scale(0.97);
 }
 
 body.dark-mode .profile-dropdown {
@@ -1704,7 +1933,7 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
 /* ให้พื้นหลังรอบนอกของ Login เปลี่ยนตามโหมด */
 #login-screen {
     background: var(--bg-color) !important;
-    transition: background 0.3s ease;
+    transition: background var(--t-slow);
 }
 
 .login-split-wrapper {
@@ -1712,8 +1941,8 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
     display: flex;
     align-items: center;
     width: 100%;
-    max-width: 900px;
-    min-height: 550px;
+    max-width: 880px;
+    min-height: 540px;
     margin: 0 auto;
 }
 
@@ -1723,56 +1952,63 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
     z-index: 2;
     width: 45%;
     background: var(--card-bg);
-    padding: 3.5rem 3rem;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
+    padding: 3rem 2.75rem;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0,0,0,0.06);
+    border-radius: var(--radius-sm);
+    transition: background var(--t-slow), box-shadow var(--t-slow);
 }
 
+/* =========================================
+   Login Image (Static Premium Style)
+   ========================================= */
 .login-image-side {
     position: absolute;
     right: 0;
     z-index: 1;
     width: 65%;
     height: 100%;
-    /* แนะนำให้เปลี่ยน URL เป็นรูปร้าน รูปค็อกเทล หรือบาร์สวยๆ */
+    /* ใช้รูปเครื่องดื่มโทนดาร์กรูปเดียว ดูคลาสสิกเข้ากับทุกโหมด */
     background: url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80') center/cover no-repeat;
-    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
+    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.7);
+    /* เงาดำกลืนขอบให้ดูลึกและแพงขึ้น */
     border-radius: 4px;
 }
 
 .login-title {
-    font-size: 28px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 800;
     color: var(--text-main);
-    margin-bottom: 2rem;
-    letter-spacing: 0.5px;
+    margin-bottom: 1.75rem;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
 }
 
 .login-field {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.125rem;
 }
 
 .login-field label {
     display: block;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-main);
-    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 
 .login-field input[type="text"],
 .login-field input[type="password"] {
     width: 100%;
-    padding: 12px 14px;
-    font-size: 15px;
+    padding: 11px 13px;
+    font-size: 14px;
     background: var(--alchemy-input-bg);
-    border: 1px solid transparent;
-    border-radius: 4px;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-sm);
     outline: none;
     font-family: inherit;
     color: #111;
-    transition: all 0.3s ease;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
 }
 
 .login-field input:focus {
@@ -1804,22 +2040,29 @@ body.dark-mode .ts-wrapper .ts-control input::placeholder {
 
 .btn-submit-alchemy {
     width: 100%;
-    padding: 14px;
+    padding: 13px;
     background: var(--alchemy-btn);
     color: #FFF;
     border: none;
-    border-radius: 4px;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 1px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
     cursor: pointer;
     text-transform: uppercase;
-    transition: background 0.3s, transform 0.2s;
+    transition: background var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
+    font-family: inherit;
 }
 
 .btn-submit-alchemy:hover {
     background: var(--primary);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-red);
+}
+
+.btn-submit-alchemy:active {
+    transform: scale(0.98);
+    box-shadow: none;
 }
 
 /* =========================================
@@ -1879,4 +2122,854 @@ body.dark-mode .btn-submit-alchemy:hover {
     body.dark-mode .login-form-side {
         box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.5);
     }
+}
+
+/* =========================================
+   FullCalendar Theme Overrides (Match App)
+   ========================================= */
+body {
+    --fc-border-color: var(--border-light);
+    --fc-button-bg-color: var(--card-bg);
+    --fc-button-border-color: var(--border-light);
+    --fc-button-text-color: var(--text-main);
+    --fc-button-hover-bg-color: var(--bg-color);
+    --fc-button-hover-border-color: var(--primary);
+    --fc-button-active-bg-color: var(--primary);
+    --fc-button-active-border-color: var(--primary);
+    --fc-button-active-text-color: #fff;
+    --fc-event-bg-color: var(--primary);
+    --fc-event-border-color: var(--primary);
+    --fc-page-bg-color: var(--card-bg);
+    --fc-neutral-bg-color: var(--bg-color);
+    --fc-list-event-hover-bg-color: var(--bg-color);
+    --fc-today-bg-color: rgba(211, 47, 47, 0.08);
+    /* สีแดงอ่อนๆ สำหรับขีดเส้นใต้/พื้นหลังวันปัจจุบัน */
+}
+
+.fc {
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+    border-color: var(--border-light);
+}
+
+.fc-daygrid-day.fc-day-today {
+    background-color: var(--fc-today-bg-color) !important;
+}
+
+.fc-h-event {
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.fc-h-event:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.fc .fc-button {
+    font-family: inherit;
+    font-weight: 500;
+    text-transform: capitalize;
+    box-shadow: none !important;
+}
+
+.fc .fc-toolbar-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+/* =========================================
+   APPOINTMENT MODAL — Google Calendar Style
+   ========================================= */
+
+.apt-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: aptOverlayIn 0.18s ease;
+}
+
+.apt-modal-overlay.open {
+    display: flex;
+}
+
+@keyframes aptOverlayIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.apt-modal-box {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 456px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0,0,0,0.08);
+    animation: aptBoxIn 0.24s var(--ease-spring);
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+}
+
+@keyframes aptBoxIn {
+    from {
+        transform: scale(0.94) translateY(10px);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Header */
+.apt-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 0 20px;
+}
+
+.apt-modal-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    letter-spacing: -0.2px;
+}
+
+.apt-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
+    padding: 0;
+}
+
+.apt-close-btn:hover {
+    background: var(--bg-color);
+    color: var(--text-main);
+    transform: rotate(90deg);
+}
+
+/* Time row */
+.apt-time-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px 0 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* Fields */
+.apt-field {
+    padding: 8px 20px 0 20px;
+}
+
+.apt-field-icon {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding-top: 10px;
+}
+
+.apt-field-icon svg {
+    margin-top: 10px;
+    flex-shrink: 0;
+}
+
+.apt-field-icon input,
+.apt-field-icon textarea {
+    flex: 1;
+}
+
+.apt-title-input {
+    width: 100%;
+    border: none;
+    border-bottom: 2px solid var(--border-light);
+    border-radius: 0;
+    background: transparent;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-main);
+    padding: 8px 0;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.apt-title-input:focus {
+    border-bottom-color: var(--primary);
+    box-shadow: none;
+    background: transparent;
+}
+
+.apt-title-input::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 16px;
+}
+
+.apt-field input[type="text"]:not(.apt-title-input),
+.apt-field textarea {
+    width: 100%;
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text-main);
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: none;
+}
+
+.apt-field input[type="text"]:not(.apt-title-input):focus,
+.apt-field textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    background: var(--card-bg);
+}
+
+.apt-type-tabs {
+    display: flex;
+    gap: var(--sp-1);
+    padding: 10px 20px 0 20px;
+}
+
+.apt-type-btn {
+    flex: 1;
+    padding: 7px 8px;
+    border: 1.5px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-color);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--t-fast);
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.apt-type-btn:hover:not(.active) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.apt-type-btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: var(--shadow-red);
+    font-weight: 600;
+}
+
+.apt-type-btn:hover:not(.active) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Color swatches */
+.apt-options-row {
+    display: flex;
+    gap: 20px;
+    padding: 12px 20px 0 20px;
+    align-items: flex-end;
+}
+
+.apt-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.apt-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.apt-color-swatches {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.apt-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+    display: block;
+    flex-shrink: 0;
+}
+
+.apt-swatch:hover {
+    transform: scale(1.2);
+}
+
+.apt-swatch.active {
+    border-color: var(--text-main);
+    transform: scale(1.15);
+}
+
+.apt-select {
+    padding: 7px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-main);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.apt-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* Footer */
+.apt-modal-footer {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px 20px 20px;
+    margin-top: 16px;
+    border-top: 1px solid var(--border-light);
+    gap: 8px;
+}
+
+.apt-btn-delete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid #F0D0D0;
+    color: var(--danger);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+
+.apt-btn-delete:hover {
+    background: #FEF0F0;
+    border-color: var(--danger);
+}
+
+.apt-btn-cancel {
+    padding: 9px 18px;
+    background: var(--bg-color);
+    color: var(--text-main);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: inherit;
+}
+
+.apt-btn-cancel:hover {
+    background: var(--border-light);
+}
+
+.apt-btn-save {
+    padding: 9px 20px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(211, 47, 47, 0.25);
+}
+
+.apt-btn-save:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.apt-btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Dark mode overrides */
+body.dark-mode .apt-modal-box {
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+}
+
+body.dark-mode .apt-title-input {
+    border-bottom-color: #333;
+}
+
+body.dark-mode .apt-title-input:focus {
+    border-bottom-color: var(--primary);
+}
+
+/* FullCalendar extra tweaks */
+.fc .fc-timegrid-event .fc-event-main {
+    padding: 2px 4px;
+}
+
+.fc .fc-event-title {
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.fc-timegrid-now-indicator-line {
+    border-color: var(--primary) !important;
+}
+
+.fc-timegrid-now-indicator-arrow {
+    border-top-color: var(--primary) !important;
+}
+
+.fc .fc-highlight {
+    background: rgba(211, 47, 47, 0.12) !important;
+}
+
+.fc .fc-daygrid-event,
+.fc .fc-timegrid-event {
+    border-radius: 4px !important;
+    cursor: pointer;
+}
+
+.fc .fc-timegrid-event:hover {
+    filter: brightness(1.1);
+}
+
+body.dark-mode .fc .fc-button {
+    background: var(--card-bg) !important;
+    border-color: var(--border-light) !important;
+    color: var(--text-main) !important;
+}
+
+body.dark-mode .fc .fc-button:hover {
+    background: var(--bg-color) !important;
+    border-color: var(--primary) !important;
+}
+
+body.dark-mode .fc .fc-button-active {
+    background: var(--primary) !important;
+    border-color: var(--primary) !important;
+    color: #fff !important;
+}
+
+body.dark-mode .fc-theme-standard td,
+body.dark-mode .fc-theme-standard th {
+    border-color: var(--border-light) !important;
+}
+
+body.dark-mode .fc-daygrid-day-number,
+body.dark-mode .fc-col-header-cell-cushion,
+body.dark-mode .fc-list-day-text,
+body.dark-mode .fc-list-day-side-text {
+    color: var(--text-main) !important;
+}
+
+body.dark-mode .fc-list-event:hover td {
+    background: var(--bg-color) !important;
+}
+
+@media (max-width: 480px) {
+    .apt-modal-box {
+        border-radius: 16px 16px 0 0;
+        margin-top: auto;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .apt-modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .apt-type-tabs {
+        flex-wrap: wrap;
+    }
+
+    .apt-options-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* =========================================
+   Mobile UX Improvements
+   ========================================= */
+
+/* --- Header mobile: compact layout --- */
+@media (max-width: 768px) {
+    .header {
+        margin-bottom: 1rem;
+    }
+
+    /* Page title เล็กลงนิดหน่อย */
+    .header h2,
+    #page-title {
+        font-size: 17px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Header actions: ลด gap */
+    .header>div:last-child {
+        gap: var(--sp-2) !important;
+    }
+
+    /* Avatar: เล็กลง */
+    #avatar-initial {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    /* Bell: เล็กลง */
+    #notif-bell {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    /* App main padding ลดลง */
+    .app-main {
+        padding: 1rem 0.875rem !important;
+    }
+
+    /* rec-badge: ให้ JS ควบคุมการแสดง (เฉพาะ list tab) */
+    .header>div:first-child {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: var(--sp-2) !important;
+        flex-wrap: wrap;
+    }
+
+    /* rec-badge ขนาดเล็กลงบน mobile */
+    .header .rec-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        opacity: 0.8;
+        white-space: nowrap;
+    }
+}
+
+/* --- Filters: 2 columns บน mobile แต่ compact กว่าเดิม --- */
+@media (max-width: 480px) {
+    .filters {
+        gap: 8px !important;
+        margin-bottom: 1rem;
+    }
+
+    /* Filter selects สูงน้อยลง */
+    .filter-select,
+    .filters input[type="text"],
+    .filters select {
+        padding: 8px 10px !important;
+        font-size: 13px !important;
+    }
+
+    /* Date filter wrap */
+    #fl-date-wrap input {
+        padding: 8px 10px !important;
+        font-size: 13px !important;
+    }
+}
+
+/* --- Calendar header: ปรับ FullCalendar toolbar บน mobile --- */
+@media (max-width: 480px) {
+
+    /* FullCalendar toolbar layout */
+    .fc .fc-toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 16px !important;
+    }
+
+    /* View buttons เล็กลง */
+    .fc .fc-button {
+        padding: 5px 10px !important;
+        font-size: 12px !important;
+    }
+
+    /* Nav buttons */
+    .fc .fc-prev-button,
+    .fc .fc-next-button {
+        padding: 5px 8px !important;
+    }
+
+    /* Today button */
+    .fc .fc-today-button {
+        padding: 5px 10px !important;
+        font-size: 12px !important;
+    }
+}
+
+/* --- Touch targets: ปุ่มทุกตัว min 44px --- */
+@media (max-width: 768px) {
+
+    .btn-primary,
+    .btn-secondary {
+        min-height: 44px;
+    }
+
+    /* Visit card: padding ลดลงเล็กน้อยเพื่อให้เห็น content มากขึ้น */
+    .visit-card {
+        padding: 0.875rem 1rem !important;
+    }
+
+    /* Card padding ลดลงบน mobile */
+    .card {
+        padding: 1.125rem !important;
+    }
+}
+
+/* profile dropdown: คงเป็น absolute dropdown ปกติทุก size */
+
+/* --- Skeleton cards: ลด padding --- */
+@media (max-width: 480px) {
+    .skeleton-card {
+        padding: 1rem !important;
+    }
+}
+
+/* =========================================
+   Flatpickr Custom Time Row
+   ========================================= */
+.fp-custom-time-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px 12px;
+    border-top: 1px solid var(--border-light);
+    background: var(--card-bg);
+}
+
+.fp-time-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex: 1;
+}
+
+.fp-time-select {
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-main);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 66px;
+}
+
+.fp-time-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.fp-time-sep {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+/* ============================================================
+   NOTIFICATION PANEL — ระบบแจ้งเตือน (เพิ่มใหม่)
+   ============================================================ */
+.notif-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 308px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    z-index: 200;
+    overflow: hidden;
+    animation: notif-slide-in 0.2s var(--ease-out);
+}
+
+@keyframes notif-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.notif-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-color);
+}
+
+.notif-clear-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: background 0.2s;
+}
+
+.notif-clear-btn:hover {
+    background: rgba(211, 47, 47, 0.1);
+}
+
+.notif-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notif-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+    transition: background 0.15s;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background: var(--bg-color);
+}
+
+.notif-icon {
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-msg {
+    font-size: 13px;
+    color: var(--text-main);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.notif-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+/* ============================================================
+   APPOINTMENT MODAL — Start/End time row (เพิ่มใหม่)
+   ============================================================ */
+.fp-time-select {
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 4px 6px;
+    cursor: pointer;
+    min-width: 52px;
+}
+
+.fp-time-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* ============================================================
+   แก้มุมมอง List ของปฏิทินในโหมด Dark Mode ให้แสดงผลถูกต้อง (แบบบังคับทับ 100%)
+   ============================================================ */
+body.dark-mode .fc-theme-standard .fc-list-day-cushion,
+body.dark-mode .fc-list-day-cushion {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.dark-mode .fc-list-day-text,
+body.dark-mode .fc-list-day-side-text {
+    color: var(--text-main) !important;
+    font-weight: 600 !important;
+}
+
+body.dark-mode .fc-list-event:hover td {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+body.dark-mode .fc-list-table td {
+    border-color: var(--border-light) !important;
 }
