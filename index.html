@@ -1,1050 +1,1520 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Visitation ERP — Admin Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet">
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="admin.css">
+  </head>
+  <body>
 
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Visitation</title>
-        <link rel="manifest" href="manifest.json">
-        <meta name="theme-color" content="#D32F2F">
-        <link rel="apple-touch-icon" href="icon.png">
-        <link rel="stylesheet" href="style.css">
-        <style>
-        /* Tom Select — match app theme */
-        .ts-wrapper { width: 100%; }
-        .ts-wrapper .ts-control {
-            padding: 10px 14px;
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-sm);
-            background: var(--card-bg);
-            color: var(--text-main);
-            font-family: inherit;
-            font-size: 14px;
-            box-shadow: none;
-            min-height: unset;
-            gap: 4px;
-        }
-        .ts-wrapper.focus .ts-control { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
-        .ts-dropdown {
-            background: var(--card-bg);
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-sm);
-            box-shadow: var(--shadow-md);
-            color: var(--text-main);
-            font-family: inherit;
-            font-size: 14px;
-            margin-top: 4px;
-        }
-        .ts-dropdown .option { padding: 10px 14px; }
-        .ts-dropdown .option:hover, .ts-dropdown .option.active { background: rgba(211,47,47,0.15); color: var(--text-main); }
-        .ts-dropdown .option.selected { background: rgba(211,47,47,0.25); }
-        .ts-wrapper .ts-control input { color: var(--text-main); font-family: inherit; font-size: 14px; }
-        .ts-wrapper .ts-control input::placeholder { color: var(--text-muted); }
-        .ts-dropdown-content { max-height: 220px; }
-        .ts-wrapper .clear-button { color: var(--text-muted); }
-    </style>
-        <link rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-        <link rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.min.css">
-        <script
-            src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    </head>
+    <div id="login-screen" style="position:relative;">
+      <button class="login-theme-btn" onclick="toggleTheme()"
+        title="Toggle Theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" id="theme-icon-login">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      </button>
+      <div class="login-card">
+        <div class="login-logo">
+          <div class="login-logo-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+              stroke="white" stroke-width="2.5" stroke-linecap="round"
+              stroke-linejoin="round"><path d="M9 11l3 3L22 4" /><path
+                d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+          </div>
+          <div>
+            <div class="login-logo-text">Visitation ERP</div>
+            <div class="login-logo-sub">Admin Console</div>
+          </div>
+        </div>
+        <div class="login-divider"></div>
+        <div class="field-group">
+          <label>Supabase URL</label>
+          <input type="text" id="inp-url" placeholder="https://xxxx.supabase.co"
+            autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label>API Key</label>
+          <input type="password" id="inp-key" placeholder="sb_publishable_..."
+            autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label>Admin Password</label>
+          <input type="password" id="inp-pass" placeholder="••••••••"
+            autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="remember-row">
+          <input type="checkbox" id="inp-remember">
+          <label for="inp-remember">Remember me on this device</label>
+        </div>
+        <button class="btn-login" onclick="doLogin()">Sign In to Admin</button>
+      </div>
+    </div>
 
-    <body>
+    <div id="app">
 
-        <div id="welcome-screen"
-            style="display:none; position:fixed; inset:0; background:var(--bg-color); z-index:999999; flex-direction:column; align-items:center; justify-content:center;">
-            <div id="welcome-avatar"
-                style="width:80px; height:80px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; margin-bottom:24px; box-shadow:var(--shadow-md); position:relative; overflow:hidden;">
-                <span id="welcome-avatar-text"></span>
-                <img id="welcome-avatar-img" src
-                    style="display:none; width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">
+      <header class="app-header">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()"
+          aria-label="Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"><line
+              x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21"
+              y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+        </button>
+        <div class="header-brand">
+          <div class="brand-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="white" stroke-width="2.5" stroke-linecap="round"
+              stroke-linejoin="round"><path d="M9 11l3 3L22 4" /><path
+                d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+          </div>
+          <div class="brand-name">Visitation <span>ERP</span></div>
+        </div>
+        <div class="header-center">
+          <div class="header-search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <input class="header-search" id="global-search"
+              placeholder="Search customers, visits..."
+              onkeydown="if(event.key==='Enter')globalSearch()">
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" onclick="toggleTheme()" title="Toggle Theme">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" id="theme-icon-app"><path
+                d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+          </button>
+          <button class="icon-btn" id="notif-btn"
+            onclick="showPage('field');filterVis('pending',document.querySelector('#vis-pill-group .pill:nth-child(2)'))"
+            title="Delete Requests">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><path
+                d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path
+                d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+            <span class="notif-dot" id="notif-dot" style="display:none;"></span>
+          </button>
+          <button class="btn-logout-header" onclick="doLogout()">
+            <span>Logout</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="sidebar-backdrop" id="sidebar-backdrop"
+        onclick="toggleSidebar()"></div>
+
+      <nav class="sidebar" id="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Overview</div>
+          <button class="nav-item active" id="nav-dashboard"
+            onclick="showPage('dashboard')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7"
+                height="7" rx="1" /><rect x="14" y="3" width="7" height="7"
+                rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect
+                x="14" y="14" width="7" height="7" rx="1" /></svg>
+            Dashboard
+          </button>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Field Operations</div>
+          <button class="nav-item" id="nav-field" onclick="showPage('field')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><path
+                d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle
+                cx="12" cy="10" r="3" /></svg>
+            Field Operations
+            <span class="nav-badge" id="req-badge"
+              style="display:none;">0</span>
+          </button>
+          <button class="nav-item" id="nav-activity"
+            onclick="showPage('activity')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><polyline
+                points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+            Activity Log
+          </button>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Sales & CRM</div>
+          <button class="nav-item" id="nav-customers"
+            onclick="showPage('customers')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><path
+                d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline
+                points="9 22 9 12 15 12 15 22" /></svg>
+            Customers
+          </button>
+          <button class="nav-item" id="nav-contracts"
+            onclick="showPage('contracts')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline
+                points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8"
+                y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline
+                points="10 9 9 9 8 9" /></svg>
+            Contracts
+          </button>
+          <button class="nav-item" id="nav-offtake"
+            onclick="showPage('offtake')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><line x1="12" y1="20"
+                x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line
+                x1="6" y1="20" x2="6" y2="16" /></svg>
+            Off-take Orders
+          </button>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Catalog</div>
+          <button class="nav-item" id="nav-products"
+            onclick="showPage('products')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></svg>
+            Products
+          </button>
+          <button class="nav-item" id="nav-price" onclick="showPage('price')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><line x1="12" y1="1"
+                x2="12" y2="23" /><path
+                d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+            Price List
+          </button>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Admin</div>
+          <button class="nav-item" id="nav-users" onclick="showPage('users')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"><path
+                d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12"
+                cy="7" r="4" /></svg>
+            Users
+          </button>
+        </div>
+      </nav>
+
+      <main class="main-content">
+
+        <div class="page active" id="page-dashboard">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Dashboard</div>
+              <div class="page-sub" id="dash-updated">Loading data...</div>
             </div>
-            <h2 id="welcome-text"
-                style="font-size:26px; color:var(--text-main); font-weight:700; opacity:0; transform:translateY(20px); transition:all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);">Hello,
-                User!</h2>
-            <p id="welcome-sub"
-                style="font-size:15px; color:var(--text-muted); margin-top:8px; opacity:0; transform:translateY(20px); transition:all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.15s;">Setting
-                up your workspace...</p>
+            <div class="head-actions">
+              <button class="btn btn-outline btn-sm"
+                onclick="refreshDashboard()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><polyline
+                    points="23 4 23 10 17 10" /><polyline
+                    points="1 20 1 14 7 14" /><path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+          <div class="stats-grid" id="dash-stats">
+            <div class="stat-card"><div class="stat-label">Active
+                Visits</div><div class="stat-value clr-green skeleton"
+                style="height:40px;width:80px;margin:4px 0;"></div></div>
+            <div class="stat-card amber"><div class="stat-label">Pending
+                Delete</div><div class="stat-value clr-amber skeleton"
+                style="height:40px;width:60px;margin:4px 0;"></div></div>
+            <div class="stat-card red"><div class="stat-label">Total
+                Customers</div><div class="stat-value clr-red skeleton"
+                style="height:40px;width:70px;margin:4px 0;"></div></div>
+            <div class="stat-card blue"><div class="stat-label">Active
+                Contracts</div><div class="stat-value clr-blue skeleton"
+                style="height:40px;width:60px;margin:4px 0;"></div></div>
+            <div class="stat-card"><div class="stat-label">Total
+                Orders</div><div class="stat-value skeleton"
+                style="height:40px;width:70px;margin:4px 0;"></div></div>
+            <div class="stat-card"><div class="stat-label">Active
+                Users</div><div class="stat-value skeleton"
+                style="height:40px;width:50px;margin:4px 0;"></div></div>
+          </div>
+          <div class="grid-2" style="margin-bottom:16px;">
+            <div class="card">
+              <div class="card-head"><div class="card-title">Visits by
+                  Area</div></div>
+              <div class="card-body"><div class="chart-wrap"><canvas
+                    id="areaChart"></canvas></div></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><div class="card-title">Visits by
+                  Position</div></div>
+              <div class="card-body"><div class="chart-wrap"><canvas
+                    id="posChart"></canvas></div></div>
+            </div>
+            <div class="card col-span-2">
+              <div class="card-head"><div class="card-title">Recent
+                  Visits</div><button class="btn btn-outline btn-sm"
+                  onclick="showPage('visits')">View All</button></div>
+              <div class="card-body" style="padding:0 1.25rem;"
+                id="dash-recent"></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><div class="card-title">Expiring Contracts
+                  (30 days)</div></div>
+              <div class="card-body" style="padding:0 1.25rem;"
+                id="dash-contracts-expiring"></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><div class="card-title">Recent Activity
+                  Log</div></div>
+              <div class="card-body" style="padding:0 1.25rem;"
+                id="dash-activity"></div>
+            </div>
+          </div>
         </div>
 
-        <div id="login-screen"
-            style="display:flex; position:relative; align-items:center; justify-content:center; min-height:100vh; padding: 2rem;">
+        <!-- ═══ FIELD OPERATIONS ═══ -->
+        <div class="page" id="page-field">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Field Operations</div>
+              <div class="page-sub" id="vis-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <button class="btn btn-outline btn-sm" id="field-export-btn"
+                onclick="exportVisits()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><path
+                    d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline
+                    points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12"
+                    y2="3" /></svg>
+                Export CSV
+              </button>
+            </div>
+          </div>
 
-            <button id="theme-toggle-login" class="btn-icon"
-                onclick="toggleDarkMode()" title="Toggle Dark Mode"
-                style="position: absolute; top: 24px; right: 24px; background: var(--card-bg); border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 10; transition: all 0.3s ease;">
-                <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round"
-                    style="display: none;"><circle cx="12" cy="12"
-                        r="5"></circle><line x1="12" y1="1" x2="12"
-                        y2="3"></line><line x1="12" y1="21" x2="12"
-                        y2="23"></line><line x1="4.22" y1="4.22" x2="5.64"
-                        y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78"
-                        y2="19.78"></line><line x1="1" y1="12" x2="3"
-                        y2="12"></line><line x1="21" y1="12" x2="23"
-                        y2="12"></line><line x1="4.22" y1="19.78" x2="5.64"
-                        y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78"
-                        y2="4.22"></line></svg>
-                <svg class="moon-icon" width="20" height="20"
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round"><path
-                        d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <!-- Tab switcher -->
+          <div class="pill-group" style="margin-bottom:16px;">
+            <button class="pill active" id="ftab-visits"
+              onclick="switchFieldTab('visits',this)">Visits</button>
+            <button class="pill" id="ftab-visitation"
+              onclick="switchFieldTab('visitation',this)">Visitation
+              Report</button>
+          </div>
+
+          <!-- TAB: Visits -->
+          <div id="field-tab-visits">
+            <div class="bulk-bar" id="vis-bulk-bar">
+              <span class="bulk-text"><span id="vis-bulk-count">0</span>
+                selected</span>
+              <button class="btn btn-success btn-sm"
+                onclick="askBulkAction('approve')">Approve All</button>
+              <button class="btn btn-danger btn-sm"
+                onclick="askBulkAction('reject')">Reject All</button>
+              <button class="btn btn-outline btn-sm" style="margin-left:auto;"
+                onclick="exportSelected()">Export Selected</button>
+            </div>
+            <div class="table-wrap">
+              <div class="table-toolbar">
+                <div class="pill-group" id="vis-pill-group">
+                  <button class="pill active"
+                    onclick="filterVis('active',this)">Active</button>
+                  <button class="pill" onclick="filterVis('pending',this)">
+                    Pending Delete <span id="req-badge-pending"
+                      style="display:none;background:var(--amber);color:#fff;border-radius:99px;font-size:10px;padding:1px 6px;margin-left:2px;">0</span>
+                  </button>
+                  <button class="pill"
+                    onclick="filterVis('deleted',this)">Archived</button>
+                </div>
+                <div
+                  style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
+                  <select class="select-field" id="vis-date-range"
+                    onchange="resetAndLoadVisits()">
+                    <option value="all">All Time</option>
+                    <option value="7days">Last 7 Days</option>
+                    <option value="this_month">This Month</option>
+                    <option value="last_month">Last Month</option>
+                  </select>
+                  <div class="input-wrap">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2"><circle cx="11"
+                        cy="11" r="8" /><line x1="21" y1="21" x2="16.65"
+                        y2="16.65" /></svg>
+                    <input class="input-field has-icon" id="vis-search"
+                      placeholder="Search outlet..." style="width:180px;"
+                      onkeydown="if(event.key==='Enter')resetAndLoadVisits()">
+                  </div>
+                </div>
+              </div>
+              <div class="tbl-scroll">
+                <table>
+                  <thead id="vis-thead"></thead>
+                  <tbody id="vis-tbody"><tr><td colspan="8"
+                        style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+                </table>
+              </div>
+              <div class="pagination" id="vis-pagination"></div>
+            </div>
+          </div>
+
+          <!-- TAB: Visitation Report -->
+          <div id="field-tab-visitation" style="display:none;">
+            <div class="table-wrap">
+              <div class="table-toolbar">
+                <div class="pill-group">
+                  <button class="pill active" id="vt-pill-daily"
+                    onclick="filterVisitation('daily',this)">Daily</button>
+                  <button class="pill" id="vt-pill-weekly"
+                    onclick="filterVisitation('weekly',this)">Weekly</button>
+                  <button class="pill" id="vt-pill-monthly"
+                    onclick="filterVisitation('monthly',this)">Monthly</button>
+                </div>
+                <div style="margin-left:auto;display:flex;gap:8px;">
+                  <select class="select-field" id="visit-team-filter"
+                    onchange="loadVisitation()">
+                    <option value>All Teams</option>
+                  </select>
+                  <input type="date" class="input-field" id="vt-date"
+                    onchange="loadVisitation()">
+                </div>
+              </div>
+              <div class="tbl-scroll">
+                <table>
+                  <thead><tr><th>Customer</th><th>Team</th><th>BDE
+                        Area</th><th>Report</th><th>Result</th><th>Date</th></tr></thead>
+                  <tbody id="vt-tbody"><tr><td colspan="6"
+                        style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ ACTIVITY LOG ═══ -->
+        <div class="page" id="page-activity">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Activity Log</div>
+              <div class="page-sub" id="act-meta">Customer activity
+                history</div>
+            </div>
+            <div class="head-actions">
+              <button class="btn btn-primary btn-sm"
+                onclick="openActivityModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><line x1="12" y1="5"
+                    x2="12" y2="19" /><line x1="5" y1="12" x2="19"
+                    y2="12" /></svg>
+                Add Log
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="table-toolbar">
+              <div class="input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                    r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input class="input-field has-icon" id="act-search"
+                  placeholder="Search customer..." style="width:200px;"
+                  onkeydown="if(event.key==='Enter')loadActivity()">
+              </div>
+            </div>
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>Log
+                      ID</th><th>Customer</th><th>Type</th><th>Note</th><th>Created
+                      By</th><th>Date</th></tr></thead>
+                <tbody id="act-tbody"><tr><td colspan="6"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ CUSTOMER MASTER DATA ═══ -->
+        <div class="page" id="page-customers">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Customer Master Data</div>
+              <div class="page-sub" id="cust-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <div class="input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                    r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input class="input-field has-icon" id="cust-search"
+                  placeholder="Search..." style="width:180px;"
+                  onkeydown="if(event.key==='Enter')resetAndLoadCustomers()">
+              </div>
+              <select class="select-field" id="cust-team-filter"
+                onchange="onCustTeamFilterChange(); resetAndLoadCustomers();"
+                style="min-width:130px;">
+                <option value>All Teams</option>
+                <option value="Horeca">Horeca</option>
+                <option value="On Premise">On Premise</option>
+                <option value="Southern">Southern</option>
+              </select>
+              <select class="select-field" id="cust-area-filter"
+                onchange="onCustAreaFilterChange()" style="min-width:110px;">
+                <option value>All Areas</option>
+              </select>
+              <select class="select-field" id="cust-bde-filter"
+                onchange="resetAndLoadCustomers()" style="min-width:130px;">
+                <option value>All BDE</option>
+              </select>
+              <select class="select-field" id="cust-status-filter"
+                onchange="resetAndLoadCustomers()">
+                <option value>All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+              <button class="btn btn-primary btn-sm"
+                onclick="openCustomerModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><line x1="12" y1="5"
+                    x2="12" y2="19" /><line x1="5" y1="12" x2="19"
+                    y2="12" /></svg>
+                Add Customer
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>ID</th><th>Outlet
+                      Name</th><th>Company</th><th>Team</th><th>BDE</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="cust-tbody"><tr><td colspan="8"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="cust-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ═══ CONTRACTS ═══ -->
+        <div class="page" id="page-contracts">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Contract Management</div>
+              <div class="page-sub" id="con-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <select class="select-field" id="con-type-filter"
+                onchange="loadContracts()">
+                <option value>All Types</option>
+                <option value="ANNUAL">Annual</option>
+                <option value="QUARTERLY">Quarterly</option>
+                <option value="MONTHLY">Monthly</option>
+              </select>
+              <button class="btn btn-primary btn-sm"
+                onclick="openContractModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><line x1="12" y1="5"
+                    x2="12" y2="19" /><line x1="5" y1="12" x2="19"
+                    y2="12" /></svg>
+                New Contract
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="table-toolbar">
+              <div class="pill-group">
+                <button class="pill active"
+                  onclick="filterContracts('all',this)">All</button>
+                <button class="pill"
+                  onclick="filterContracts('active',this)">Active</button>
+                <button class="pill"
+                  onclick="filterContracts('expiring',this)">Expiring
+                  Soon</button>
+                <button class="pill"
+                  onclick="filterContracts('expired',this)">Expired</button>
+              </div>
+            </div>
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>Contract
+                      ID</th><th>Customer</th><th>Period</th><th>Value</th><th>Progress</th><th>Type</th><th>Brands</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="con-tbody"><tr><td colspan="9"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ ORDERS ═══ -->
+        <div class="page" id="page-offtake">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Off-take Orders</div>
+              <div class="page-sub" id="ord-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <select class="select-field" id="ord-date-filter"
+                onchange="loadOrders()">
+                <option value="all">All Time</option>
+                <option value="this_month">This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="7days">Last 7 Days</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="exportOrders()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><path
+                    d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline
+                    points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12"
+                    y2="3" /></svg>
+                Export
+              </button>
+            </div>
+          </div>
+          <div class="stats-grid" id="ord-stats"
+            style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:1rem;"></div>
+          <div class="table-wrap">
+            <div class="table-toolbar">
+              <div class="input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                    r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input class="input-field has-icon" id="ord-search"
+                  placeholder="Search product / customer..."
+                  style="width:220px;" oninput="renderOrders()">
+              </div>
+            </div>
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>Order
+                      ID</th><th>Customer</th><th>Product</th><th>Qty</th><th>Rebate
+                      %</th><th>WS</th><th>Date</th><th>User</th></tr></thead>
+                <tbody id="ord-tbody"><tr><td colspan="8"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="ord-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ═══ PRODUCTS ═══ -->
+        <div class="page" id="page-products">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Products Catalog</div>
+              <div class="page-sub" id="prod-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <div class="input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                    r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input class="input-field has-icon" id="prod-search"
+                  placeholder="Search products..." style="width:180px;"
+                  oninput="renderProducts()">
+              </div>
+              <select class="select-field" id="prod-cat-filter"
+                onchange="renderProducts()">
+                <option value>All Categories</option>
+              </select>
+              <button class="btn btn-primary btn-sm"
+                onclick="openProductModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><line x1="12" y1="5"
+                    x2="12" y2="19" /><line x1="5" y1="12" x2="19"
+                    y2="12" /></svg>
+                Add Product
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>Product
+                      ID</th><th>Name</th><th>Brand</th><th>Category</th><th>SKU</th><th>Unit</th><th>Price</th><th>Action</th></tr></thead>
+                <tbody id="prod-tbody"><tr><td colspan="8"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ PRICES ═══ -->
+        <div class="page" id="page-price">
+          <div class="page-head">
+            <div>
+              <div class="page-title">Price List</div>
+              <div class="page-sub" id="price-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <div class="input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                    r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input class="input-field has-icon" id="price-search"
+                  placeholder="Search price list..." style="width:180px;"
+                  oninput="renderPrices()">
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openPriceModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><line x1="12" y1="5"
+                    x2="12" y2="19" /><line x1="5" y1="12" x2="19"
+                    y2="12" /></svg>
+                Add Price
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>Price List ID</th><th>Product</th><th>List
+                      Name</th><th>Inc. VAT</th><th>Exc. VAT</th><th>Rebate
+                      %</th><th>Updated</th></tr></thead>
+                <tbody id="price-tbody"><tr><td colspan="7"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ USERS ═══ -->
+        <div class="page" id="page-users">
+          <div class="page-head">
+            <div>
+              <div class="page-title">User Management</div>
+              <div class="page-sub" id="usr-meta">—</div>
+            </div>
+            <div class="head-actions">
+              <div class="input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+                    r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input class="input-field has-icon" id="usr-search"
+                  placeholder="Search users..." style="width:180px;"
+                  onkeydown="if(event.key==='Enter')resetAndLoadUsers()">
+              </div>
+              <select class="select-field" id="usr-team-filter"
+                onchange="resetAndLoadUsers()" style="min-width:130px;">
+                <option value>All Teams</option>
+                <option value="Admin">Admin</option>
+                <option value="Horeca">Horeca</option>
+                <option value="On Premise">On Premise</option>
+                <option value="Southern">Southern</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openUserModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2"><line x1="12" y1="5"
+                    x2="12" y2="19" /><line x1="5" y1="12" x2="19"
+                    y2="12" /></svg>
+                Add User
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>User ID</th><th>Name /
+                      Email</th><th>Username</th><th>Team</th><th>Area /
+                      BDE</th><th>Outlets</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="usr-tbody"><tr><td colspan="8"
+                      style="text-align:center;padding:3rem;color:var(--text-3);">Loading...</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="usr-pagination"></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- ═══ MODALS ═══ -->
+    <div class="overlay" id="confirm-overlay">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-head">
+          <div class="modal-head-title" id="confirm-title">Confirm</div>
+          <button class="modal-close" onclick="closeConfirm()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p id="confirm-body" style="color:var(--text-2);font-size:14px;"></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline"
+            onclick="closeConfirm()">Cancel</button>
+          <button class="btn" id="confirm-ok-btn"
+            onclick="doConfirm()">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="cust-overlay">
+      <div class="modal-box modal-wide modal-customer">
+        <!-- Sticky Header -->
+        <div class="modal-head cm-head-styled">
+          <div class="cm-head-left">
+            <div class="cm-head-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2"><path
+                  d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline
+                  points="9 22 9 12 15 12 15 22" /></svg>
+            </div>
+            <div>
+              <div class="modal-head-title" id="cust-modal-title">Add
+                Customer</div>
+              <div class="cm-head-sub">Fill in all required fields to register a
+                new outlet</div>
+            </div>
+          </div>
+          <button class="modal-close"
+            onclick="closeCustomerModal()">&times;</button>
+        </div>
+
+        <div class="modal-body cm-body">
+          <input type="hidden" id="cm-id">
+
+          <!-- ─── SECTION 1: Classification ─── -->
+          <div class="cm-section">
+            <div class="cm-section-header">
+              <div class="cm-section-badge">1</div>
+              <div class="cm-section-info">
+                <div class="cm-section-title-v2">Classification &amp; Outlet
+                  Code</div>
+                <div class="cm-section-desc">Define segment, region, and
+                  auto-generate the outlet code</div>
+              </div>
+            </div>
+            <div class="cm-fields">
+              <!-- Outlet Code — hero row -->
+              <div class="cm-outlet-hero">
+                <div class="cm-outlet-hero-label">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5"><rect x="3" y="4"
+                      width="18" height="18" rx="2" /><line x1="3" y1="9"
+                      x2="21" y2="9" /><line x1="9" y1="21" x2="9"
+                      y2="9" /></svg>
+                  Outlet Code <span class="required">*</span>
+                </div>
+                <input type="text"
+                  class="form-input cm-outlet-code-input cm-outlet-hero-input"
+                  id="cm-outlet-code"
+                  placeholder="Fill fields below to generate..." readonly>
+              </div>
+              <!-- Step dropdowns: Segment → Region → Province → Group Code (2x2) -->
+              <div class="cm-row-2">
+                <div class="form-row">
+                  <label class="form-label">
+                    Segment <span class="required">*</span>
+                  </label>
+                  <div class="cm-searchable-wrap" id="wrap-cm-segment">
+                    <div class="cm-search-trigger"
+                      onclick="toggleCmSearch('cm-segment')">
+                      <span class="cm-search-val" id="val-cm-segment">-- Select
+                        --</span>
+                      <svg class="cm-search-arrow" width="12" height="12"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5"><polyline
+                          points="6 9 12 15 18 9" /></svg>
+                    </div>
+                    <div class="cm-search-dropdown" id="drop-cm-segment">
+                      <input class="cm-search-input" placeholder="Search..."
+                        oninput="filterCmOptions(this,'cm-segment')">
+                      <div class="cm-search-options" id="opts-cm-segment">
+                        <div class="cm-opt" data-val
+                          onclick="selectCmOpt('cm-segment','','-- Select --')">--
+                          Select --</div>
+                        <div class="cm-opt" data-val="H"
+                          onclick="selectCmOpt('cm-segment','H','H — Hotel')">H
+                          — Hotel</div>
+                        <div class="cm-opt" data-val="O"
+                          onclick="selectCmOpt('cm-segment','O','O — On-Premise')">O
+                          — On-Premise</div>
+                      </div>
+                    </div>
+                    <select class="cm-hidden-select" id="cm-segment"
+                      onchange="onCmRefChange()">
+                      <option value></option>
+                      <option value="H">H — Hotel</option>
+                      <option value="O">O — On-Premise</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label class="form-label">
+                    Region <span class="required">*</span>
+                  </label>
+                  <div class="cm-searchable-wrap" id="wrap-cm-region">
+                    <div class="cm-search-trigger"
+                      onclick="toggleCmSearch('cm-region')">
+                      <span class="cm-search-val" id="val-cm-region">-- Select
+                        --</span>
+                      <svg class="cm-search-arrow" width="12" height="12"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5"><polyline
+                          points="6 9 12 15 18 9" /></svg>
+                    </div>
+                    <div class="cm-search-dropdown" id="drop-cm-region">
+                      <input class="cm-search-input" placeholder="Search..."
+                        oninput="filterCmOptions(this,'cm-region')">
+                      <div class="cm-search-options" id="opts-cm-region">
+                        <div class="cm-opt" data-val
+                          onclick="selectCmOpt('cm-region','','-- Select --')">--
+                          Select --</div>
+                        <div class="cm-opt" data-val="1"
+                          onclick="selectCmOpt('cm-region','1','1 — Bangkok')">1
+                          — Bangkok</div>
+                        <div class="cm-opt" data-val="2"
+                          onclick="selectCmOpt('cm-region','2','2 — East')">2 —
+                          East</div>
+                        <div class="cm-opt" data-val="3"
+                          onclick="selectCmOpt('cm-region','3','3 — North')">3 —
+                          North</div>
+                        <div class="cm-opt" data-val="4"
+                          onclick="selectCmOpt('cm-region','4','4 — West')">4 —
+                          West</div>
+                        <div class="cm-opt" data-val="5"
+                          onclick="selectCmOpt('cm-region','5','5 — South')">5 —
+                          South</div>
+                        <div class="cm-opt" data-val="6"
+                          onclick="selectCmOpt('cm-region','6','6 — Central')">6
+                          — Central</div>
+                        <div class="cm-opt" data-val="7"
+                          onclick="selectCmOpt('cm-region','7','7 — Northeastern')">7
+                          — Northeastern</div>
+                      </div>
+                    </div>
+                    <select class="cm-hidden-select" id="cm-region"
+                      onchange="onCmRegionChange()">
+                      <option value></option>
+                      <option value="1">1 — Bangkok</option>
+                      <option value="2">2 — East</option>
+                      <option value="3">3 — North</option>
+                      <option value="4">4 — West</option>
+                      <option value="5">5 — South</option>
+                      <option value="6">6 — Central</option>
+                      <option value="7">7 — Northeastern</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="cm-row-2">
+                <div class="form-row">
+                  <label class="form-label">
+                    Province (PV) <span class="required">*</span>
+                  </label>
+                  <div class="cm-searchable-wrap" id="wrap-cm-province">
+                    <div class="cm-search-trigger"
+                      onclick="toggleCmSearch('cm-province')">
+                      <span class="cm-search-val" id="val-cm-province">-- Select
+                        Region First --</span>
+                      <svg class="cm-search-arrow" width="12" height="12"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5"><polyline
+                          points="6 9 12 15 18 9" /></svg>
+                    </div>
+                    <div class="cm-search-dropdown" id="drop-cm-province">
+                      <input class="cm-search-input" placeholder="Search..."
+                        oninput="filterCmOptions(this,'cm-province')">
+                      <div class="cm-search-options" id="opts-cm-province">
+                        <div class="cm-opt" data-val>-- Select Region First
+                          --</div>
+                      </div>
+                    </div>
+                    <select class="cm-hidden-select" id="cm-province"
+                      onchange="onCmRefChange()">
+                      <option value>-- Select Region First --</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label class="form-label">
+                    Group Code <span class="required">*</span>
+                  </label>
+                  <div class="cm-searchable-wrap" id="wrap-cm-group-code">
+                    <div class="cm-search-trigger"
+                      onclick="toggleCmSearch('cm-group-code')">
+                      <span class="cm-search-val" id="val-cm-group-code">--
+                        Select --</span>
+                      <svg class="cm-search-arrow" width="12" height="12"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5"><polyline
+                          points="6 9 12 15 18 9" /></svg>
+                    </div>
+                    <div class="cm-search-dropdown" id="drop-cm-group-code">
+                      <input class="cm-search-input" placeholder="Search..."
+                        oninput="filterCmOptions(this,'cm-group-code')">
+                      <div class="cm-search-options" id="opts-cm-group-code">
+                        <div class="cm-opt" data-val>-- Select --</div>
+                      </div>
+                    </div>
+                    <select class="cm-hidden-select" id="cm-group-code"
+                      onchange="onCmRefChange()">
+                      <option value>-- Select --</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <!-- Regions Ana optional -->
+              <div class="cm-row-half">
+                <div class="form-row">
+                  <label class="form-label">Regions Ana <span
+                      class="cm-label-en">optional</span></label>
+                  <input type="text" class="form-input" id="cm-regions-ana"
+                    placeholder="e.g. BKK">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── SECTION 2: Outlet Info ─── -->
+          <div class="cm-section">
+            <div class="cm-section-header">
+              <div class="cm-section-badge">2</div>
+              <div class="cm-section-info">
+                <div class="cm-section-title-v2">Outlet Information</div>
+                <div class="cm-section-desc">Basic outlet details and assigned
+                  team</div>
+              </div>
+            </div>
+            <div class="cm-fields">
+              <div class="form-row">
+                <label class="form-label">Outlet Name <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input cm-input-lg" id="cm-name"
+                  placeholder="e.g. The Empire Bar">
+              </div>
+              <div class="cm-row-2">
+                <div class="form-row">
+                  <label class="form-label">Status</label>
+                  <select class="form-input form-select" id="cm-status">
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="PROSPECT">Prospect</option>
+                  </select>
+                </div>
+
+              </div>
+              <div class="cm-row-3">
+                <div class="form-row">
+                  <label class="form-label">Team <span
+                      class="required">*</span></label>
+                  <select class="form-input form-select" id="cm-team"
+                    onchange="updateAreaDropdownForCustomer(this.value)">
+                    <option value>-- Select Team --</option>
+                    <option value="Horeca">Horeca</option>
+                    <option value="On Premise">On Premise</option>
+                    <option value="Southern">Southern</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label class="form-label">Area <span
+                      class="required">*</span></label>
+                  <select class="form-input form-select" id="cm-area"
+                    onchange="updateBdeDropdownByArea()">
+                    <option value>-- Select Team First --</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label class="form-label">BDE <span
+                      class="required">*</span></label>
+                  <select class="form-input form-select" id="cm-bde">
+                    <option value>-- Select Area First --</option>
+                  </select>
+                </div>
+              </div>
+              <div class="cm-row-half">
+                <div class="form-row">
+                  <label class="form-label">Tax ID</label>
+                  <input type="text" class="form-input" id="cm-tax"
+                    placeholder="0105...">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── SECTION 3: Contact ─── -->
+          <div class="cm-section cm-section-last">
+            <div class="cm-section-header">
+              <div class="cm-section-badge">3</div>
+              <div class="cm-section-info">
+                <div class="cm-section-title-v2">Contact</div>
+                <div class="cm-section-desc">Phone and email</div>
+              </div>
+            </div>
+            <div class="cm-fields">
+              <div class="cm-row-2">
+                <div class="form-row">
+                  <label class="form-label">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2.5"
+                      style="margin-right:3px;vertical-align:-1px"><path
+                        d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 14.1 19.79 19.79 0 0 1 1.61 5.5 2 2 0 0 1 3.6 3.32h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 11a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.45 18.5Z" /></svg>
+                    Phone
+                  </label>
+                  <input type="text" class="form-input" id="cm-phone"
+                    placeholder="0812345678">
+                </div>
+                <div class="form-row">
+                  <label class="form-label">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2.5"
+                      style="margin-right:3px;vertical-align:-1px"><path
+                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline
+                        points="22,6 12,13 2,6" /></svg>
+                    Email
+                  </label>
+                  <input type="email" class="form-input" id="cm-email"
+                    placeholder="contact@example.com">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Footer -->
+        <div class="modal-footer cm-footer-styled">
+          <div class="cm-footer-hint">
+            <span class="required">*</span> Required fields
+          </div>
+          <div class="cm-footer-actions">
+            <button class="btn btn-outline"
+              onclick="closeCustomerModal()">Cancel</button>
+            <button class="btn btn-primary cm-save-btn"
+              onclick="saveCustomer()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.5"><path
+                  d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline
+                  points="17 21 17 13 7 13 7 21" /><polyline
+                  points="7 3 7 8 15 8" /></svg>
+              Save Customer
             </button>
-
-            <div class="login-split-wrapper">
-
-                <div class="login-form-side">
-                    <h2 class="login-title" data-i18n="sign_in">Sign In</h2>
-
-                    <div id="login-error"
-                        style="display:none; background:#FEF8F8; color:#D48A8A; padding:10px 14px; border-radius:4px; font-size:13px; margin-bottom: 20px; border:1px solid #F0D0D0;"></div>
-
-                    <div class="login-field">
-                        <label data-i18n="username">Username</label>
-                        <input type="text" id="login-username"
-                            onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
-                    </div>
-
-                    <div class="login-field">
-                        <label data-i18n="password">Password</label>
-                        <div class="pass-wrapper">
-                            <input type="password" id="login-pass"
-                                onkeydown="if(event.key==='Enter')doUserLogin()">
-                            <button type="button"
-                                onclick="togglePasswordVisibility()"
-                                class="btn-eye" title="Toggle Password">
-                                <svg id="eye-icon" width="18" height="18"
-                                    viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path
-                                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div
-                        style="display:flex; align-items:center; gap:8px; margin-bottom: 32px; margin-top: -6px;">
-                        <input type="checkbox" id="login-remember"
-                            style="width:16px; height:16px; accent-color: var(--primary); cursor:pointer;">
-                        <label for="login-remember"
-                            style="font-size:13px; color:#666; cursor:pointer;"><span
-                                data-i18n="remember_me">Remember
-                                me</span></label>
-                    </div>
-
-                    <button class="btn-submit-alchemy"
-                        onclick="doUserLogin()"
-                        data-i18n="submit">SUBMIT</button>
-                </div>
-
-                <div class="login-image-side"></div>
-            </div>
+          </div>
         </div>
+      </div>
+    </div>
 
-        <div class="app" id="main-app" style="display:none;">
-            <div class="app-layout">
-                <div class="sidebar-overlay" id="sidebar-overlay"
-                    onclick="toggleSidebar()"></div>
-
-                <aside class="sidebar">
-                    <div class="sidebar-header" style="margin-bottom: 2rem;">
-                        <h1>Visitation</h1>
-                    </div>
-                    <div class="sidebar-nav tabs">
-                        <div class="tab active" onclick="switchTab('new')">
-                            <svg width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round"
-                                style="margin-right: 8px;"><path
-                                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline
-                                    points="14 2 14 8 20 8"></polyline><line
-                                    x1="12" y1="18" x2="12" y2="12"></line><line
-                                    x1="9" y1="15" x2="15" y2="15"></line></svg>
-                            <span data-i18n="nav_new_visit">New Visit</span>
-                        </div>
-                        <div class="tab" onclick="switchTab('list')">
-                            <svg width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round"
-                                style="margin-right: 8px;"><line x1="8" y1="6"
-                                    x2="21" y2="6"></line><line x1="8" y1="12"
-                                    x2="21" y2="12"></line><line x1="8" y1="18"
-                                    x2="21" y2="18"></line><line x1="3" y1="6"
-                                    x2="3.01" y2="6"></line><line x1="3" y1="12"
-                                    x2="3.01" y2="12"></line><line x1="3"
-                                    y1="18" x2="3.01" y2="18"></line></svg>
-                            <span data-i18n="nav_all_visits">All Visits</span>
-                        </div>
-                        <div class="tab" onclick="switchTab('calendar')">
-                            <svg width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round"
-                                style="margin-right: 8px;">
-                                <rect x="3" y="4" width="18" height="18" rx="2"
-                                    ry="2"></rect><line x1="16" y1="2" x2="16"
-                                    y2="6"></line><line x1="8" y1="2" x2="8"
-                                    y2="6"></line><line x1="3" y1="10" x2="21"
-                                    y2="10"></line>
-                            </svg>
-                            <span data-i18n="nav_calendar">Calendar</span>
-                        </div>
-                    </div>
-
-                    <div class="sidebar-footer">
-                        <button id="lang-toggle-btn"
-                            class="sidebar-theme-btn"
-                            onclick="toggleCalendarLang()"
-                            title="Toggle Language / เปลี่ยนภาษา">
-                            <svg width="14" height="14" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round"><circle cx="12" cy="12"
-                                    r="10"></circle><line x1="2" y1="12" x2="22"
-                                    y2="12"></line><path
-                                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                            <span id="lang-toggle-label">TH</span>
-                        </button>
-                        <button class="sidebar-theme-btn"
-                            onclick="toggleDarkMode()" title="Toggle Dark Mode">
-                            <svg class="sun-icon" width="18" height="18"
-                                viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round"
-                                style="display:none;"><circle cx="12" cy="12"
-                                    r="5"></circle><line x1="12" y1="1" x2="12"
-                                    y2="3"></line><line x1="12" y1="21" x2="12"
-                                    y2="23"></line><line x1="4.22" y1="4.22"
-                                    x2="5.64" y2="5.64"></line><line x1="18.36"
-                                    y1="18.36" x2="19.78"
-                                    y2="19.78"></line><line x1="1" y1="12"
-                                    x2="3" y2="12"></line><line x1="21" y1="12"
-                                    x2="23" y2="12"></line><line x1="4.22"
-                                    y1="19.78" x2="5.64" y2="18.36"></line><line
-                                    x1="18.36" y1="5.64" x2="19.78"
-                                    y2="4.22"></line></svg>
-                            <svg class="moon-icon" width="18" height="18"
-                                viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"><path
-                                    d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-                            <span class="sidebar-theme-label light-label"><span
-                                    data-i18n="dark_mode">Dark
-                                    Mode</span></span>
-                            <span class="sidebar-theme-label dark-label"><span
-                                    data-i18n="light_mode">Light
-                                    Mode</span></span>
-                        </button>
-                    </div>
-                </aside>
-
-                <main class="app-main">
-                    <div class="header"
-                        style="position: relative; z-index: 100; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                        <div
-                            style="display: flex; align-items: center; gap: 12px;">
-                            <button class="btn-icon hamburger-btn"
-                                onclick="toggleSidebar()"
-                                style="display: none; background: none; border: none; color: var(--text-main); cursor: pointer; padding: 0 4px;">
-                                <svg width="24" height="24" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round"><line x1="3" y1="12"
-                                        x2="21" y2="12"></line><line x1="3"
-                                        y1="6" x2="21" y2="6"></line><line
-                                        x1="3" y1="18" x2="21"
-                                        y2="18"></line></svg>
-                            </button>
-                            <h2 id="page-title"
-                                style="margin:0; font-size: 22px; font-weight: 600;">New
-                                Visit</h2>
-                            <span class="rec-badge" id="rec-count">0
-                                <span data-i18n="records">records</span>
-                            </div>
-
-                            <div
-                                style="display: flex; align-items: center; gap: 16px;">
-                                <div style="position:relative;">
-                                    <button id="notif-bell" class="btn-icon"
-                                        onclick="toggleNotifPanel()"
-                                        title="Notifications"
-                                        style="position: relative; background: var(--card-bg); border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: all 0.3s ease;">
-                                        <svg width="20" height="20"
-                                            viewBox="0 0 24 24" fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"><path
-                                                d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path
-                                                d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                                        <span id="notif-badge"
-                                            style="display: none; position: absolute; top: 10px; right: 12px; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; border: 2px solid var(--card-bg);"></span>
-                                    </button>
-                                    <div id="notif-panel" class="notif-panel"
-                                        style="display:none;">
-                                        <div class="notif-panel-header">
-                                            <span
-                                                style="font-weight:600; font-size:14px;"><span
-                                                    data-i18n="notifications">Notifications</span></span>
-                                            <button
-                                                onclick="clearAllNotifications()"
-                                                class="notif-clear-btn"><span
-                                                    data-i18n="clear_all">Clear
-                                                    all</span></button>
-                                        </div>
-                                        <div id="notif-list" class="notif-list">
-                                            <div
-                                                class="notif-empty">No
-                                                notifications</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="profile-menu-container"
-                                    id="profile-menu-wrap"
-                                    style="display: none; position: relative;">
-                                    <div class="profile-trigger"
-                                        onclick="toggleProfileMenu()"
-                                        style="cursor: pointer; transition: transform 0.2s ease;">
-                                        <div class="avatar" id="avatar-initial"
-                                            style="width: 44px; height: 44px; font-size: 16px; position: relative; overflow: hidden; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 2px solid var(--primary); background: var(--card-bg); color: var(--text-main); display: flex; align-items: center; justify-content: center;">
-                                            <span
-                                                id="avatar-small-text">U</span>
-                                            <img id="avatar-small-img" src
-                                                style="display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;">
-                                        </div>
-                                    </div>
-                                    <div class="profile-dropdown"
-                                        id="profile-dropdown">
-                                        <div class="pd-header">
-                                            <div class="avatar large"
-                                                id="avatar-initial-large"
-                                                onclick="document.getElementById('profile-upload-input').click()"
-                                                style="cursor: pointer; position: relative; overflow: hidden;"
-                                                title="Change Profile Picture">
-                                                <span id="avatar-text">U</span>
-                                                <img id="avatar-img" src
-                                                    style="display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;">
-                                                <div class="avatar-overlay"><svg
-                                                        width="20" height="20"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="white"
-                                                        stroke-width="2"
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"><path
-                                                            d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle
-                                                            cx="12" cy="13"
-                                                            r="4"></circle></svg></div>
-                                            </div>
-                                            <input type="file"
-                                                id="profile-upload-input"
-                                                accept="image/*"
-                                                style="display: none;"
-                                                onchange="handleProfileUpload(this)">
-                                            <div class="pd-info">
-                                                <div class="pd-name"
-                                                    id="pd-name"
-                                                    style="font-weight: 700; color: var(--text-main);">Name</div>
-                                                <div id="pd-emp-id"
-                                                    style="font-size: 11px; color: var(--primary); font-family: monospace; font-weight: 600;">EMP-000</div>
-                                            </div>
-                                        </div>
-                                        <div class="pd-body"
-                                            style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;">
-                                            <div class="pd-row"
-                                                style="display: flex; justify-content: space-between; align-items: center;"><span
-                                                    class="pd-label"
-                                                    style="font-size: 12px; color: var(--text-muted);"><span
-                                                        data-i18n="team">Team</span></span><span
-                                                    class="badge badge-area"
-                                                    id="pd-team"
-                                                    style="background:var(--primary); color:white; border:none;">Team</span></div>
-                                            <div class="pd-row"
-                                                style="display: flex; justify-content: space-between; align-items: center;"><span
-                                                    class="pd-label"
-                                                    style="font-size: 12px; color: var(--text-muted);"><span
-                                                        data-i18n="area">Area</span></span><span
-                                                    class="badge badge-pos"
-                                                    id="pd-sub-team">-</span></div>
-                                            <div class="pd-row"
-                                                style="display: flex; justify-content: space-between; align-items: center;"><span
-                                                    class="pd-label"
-                                                    style="font-size: 12px; color: var(--text-muted);"><span
-                                                        data-i18n="email">Email</span></span><span
-                                                    id="pd-email"
-                                                    style="font-size: 13px; color: var(--text-main);">email@example.com</span></div>
-                                            <div class="pd-row"
-                                                style="display: flex; justify-content: space-between; align-items: center;"><span
-                                                    class="pd-label"
-                                                    style="font-size: 12px; color: var(--text-muted);"><span
-                                                        data-i18n="contact">Contact</span></span><span
-                                                    id="pd-contact"
-                                                    style="font-size: 13px; color: var(--text-main);">-</span></div>
-                                        </div>
-                                        <div class="pd-footer"><button
-                                                class="btn-logout"
-                                                onclick="doUserLogout()"><svg
-                                                    width="16" height="16"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    stroke-width="2"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    style="margin-right: 6px;"><path
-                                                        d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline
-                                                        points="16 17 21 12 16 7"></polyline><line
-                                                        x1="21" y1="12" x2="9"
-                                                        y2="12"></line></svg><span
-                                                    data-i18n="logout">Logout</span></button></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="tab-new" style="display:none">
-                            <div class="card">
-                                <div class="section-title"><span
-                                        data-i18n="visit_info">Visit
-                                        Information</span></div>
-                                <div class="form-grid">
-                                    <div class="form-group full">
-                                        <label><span
-                                                data-i18n="customer_outlet">Customer
-                                                / Outlet</span> <span
-                                                class="req">*</span></label>
-                                        <select id="f-customer"><option value>--
-                                                Select outlet
-                                                --</option></select>
-                                        <input type="hidden" id="f-outlet-name">
-                                    </div>
-                                    <select id="f-main-team"
-                                        style="display:none;"></select>
-                                    <select id="f-sub-team"
-                                        style="display:none;"></select>
-                                    <div class="form-group">
-                                        <label><span
-                                                data-i18n="person_met">Person
-                                                You Met</span> <span
-                                                class="req">*</span></label>
-                                        <input type="text" id="f-person"
-                                            placeholder="Full name">
-                                    </div>
-                                    <div class="form-group">
-                                        <label><span
-                                                data-i18n="their_position">Their
-                                                Position</span> <span
-                                                class="req">*</span></label>
-                                        <select id="f-position">
-                                            <option value>Select
-                                                position</option>
-                                            <option>CEO</option><option>CFO</option><option>OWNER</option><option>BARTENDER</option><option>F&amp;B
-                                                MANAGER</option><option>MANAGER</option>
-                                            <option value="__other__">ETC —
-                                                Please
-                                                Type</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group full"
-                                        id="pos-other-wrap"
-                                        style="display:none">
-                                        <label><span
-                                                data-i18n="specify_pos">Specify
-                                                Position</span> <span
-                                                class="req">*</span></label>
-                                        <input type="text" id="f-pos-other"
-                                            placeholder="Enter position">
-                                    </div>
-                                    <div class="form-group full">
-                                        <label><span
-                                                data-i18n="visit_date">Visit
-                                                Date</span> <span
-                                                class="req">*</span></label>
-                                        <input type="text" id="f-date"
-                                            placeholder="Select Date">
-                                    </div>
-                                    <div class="form-group full">
-                                        <label><span
-                                                data-i18n="reason_visit">Reason
-                                                for Visit</span> <span
-                                                class="req">*</span></label>
-                                        <textarea id="f-reason" rows="2"
-                                            placeholder="Purpose of this visit..."></textarea>
-                                    </div>
-                                    <div class="form-group full">
-                                        <label><span
-                                                data-i18n="result_visit">Result
-                                                of Visit</span> <span
-                                                class="req"
-                                                id="result-req-star">*</span></label>
-                                        <textarea id="f-result" rows="2"
-                                            placeholder="Outcomes, agreements, follow-ups..."></textarea>
-                                    </div>
-                                    <div class="form-group full"
-                                        style="margin-top: 8px;">
-                                        <label><span
-                                                data-i18n="followup">Follow-up
-                                                Actions</span> <span
-                                                style="color:var(--text-muted); font-weight:normal;">(Optional)</span></label>
-                                        <div class="checkbox-grid">
-                                            <label class="cb-label"><input
-                                                    type="checkbox"
-                                                    class="f-followup"
-                                                    value="Send Quotation / Documents">
-                                                Send Quotation/Docs</label>
-                                            <label class="cb-label"><input
-                                                    type="checkbox"
-                                                    class="f-followup"
-                                                    value="Call Back Later"><span
-                                                    data-i18n="followup_callback">
-                                                    Call Back
-                                                    Later</span></label>
-                                            <label class="cb-label"><input
-                                                    type="checkbox"
-                                                    id="cb-next-visit"
-                                                    class="f-followup"
-                                                    value="Schedule Next Visit"><span
-                                                    data-i18n="followup_schedule">Schedule
-                                                    Next Visit</span></label>
-                                        </div>
-                                        <div id="next-visit-wrap"
-                                            style="display: none; margin-top: 10px; background: var(--bg-color); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light);">
-                                            <label
-                                                style="font-size: 12px; color: var(--primary); display: block; margin-bottom: 6px;"><span
-                                                    data-i18n="select_next_date">Select
-                                                    Date for Next
-                                                    Visit:</span></label>
-                                            <input type="text" id="f-next-date"
-                                                placeholder="Select Date"
-                                                style="border-color: var(--primary); width: 100%;">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card">
-                                <div class="section-title"
-                                    style="display: flex; justify-content: space-between;"><span><span
-                                            data-i18n="live_evidence">Live
-                                            Evidence</span></span><span
-                                        id="photo-counter"
-                                        style="color: var(--primary); font-weight: 600;">0
-                                        / 10</span></div>
-                                <div class="easy-camera-container">
-                                    <div
-                                        style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                                        <button class="btn-open-camera"
-                                            id="btn-start-cam"
-                                            onclick="startCamera()"
-                                            type="button"
-                                            style="margin: 0; padding: 12px 20px;"><svg
-                                                width="20" height="20"
-                                                viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                style="margin-right: 8px;"><path
-                                                    d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle
-                                                    cx="12" cy="13"
-                                                    r="4"></circle></svg>CAMERA</button>
-                                        <button class="btn-secondary"
-                                            onclick="selectFromLibrary()"
-                                            type="button"
-                                            style="margin: 0; padding: 12px 20px; border-radius: 30px; display: flex; align-items: center; font-weight: 600; border: 2px solid var(--primary); color: var(--primary);"><svg
-                                                width="20" height="20"
-                                                viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                style="margin-right: 8px;"><rect
-                                                    x="3" y="3" width="18"
-                                                    height="18" rx="2"
-                                                    ry="2" /><circle cx="8.5"
-                                                    cy="8.5" r="1.5" /><polyline
-                                                    points="21 15 16 10 5 21" /></svg>LIBRARY</button>
-                                    </div>
-                                    <input type="file" id="library-input"
-                                        accept="image/*" multiple
-                                        style="display: none;"
-                                        onchange="handleLibrarySelection(this)">
-                                    <p
-                                        style="font-size: 12px; color: var(--text-muted); margin-top: 12px;"><span
-                                            data-i18n="capture_hint">Capture or
-                                            select up to 10 photos</span></p>
-                                    <div class="captured-section"
-                                        id="captured-section"
-                                        style="display: none;"><div
-                                            class="captured-title"><span
-                                                data-i18n="captured_photos">Captured
-                                                Photos (Click to
-                                                view)</span></div><div
-                                            class="photo-previews"
-                                            id="previews"></div></div>
-                                </div>
-                            </div>
-                            <div class="form-actions"><button
-                                    class="btn-secondary"
-                                    id="btn-clear"
-                                    onclick="clearForm()"><span
-                                        data-i18n="clear">Clear</span></button><button
-                                    class="btn-primary" id="btn-save"
-                                    onclick="triggerSaveConfirm()"><span
-                                        data-i18n="save_visit">Save
-                                        Visit</span></button></div>
-                        </div>
-
-                        <div id="tab-list" style="display:none">
-                            <div class="filters"
-                                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;">
-                                <div style="width: 100%;"><select
-                                        class="filter-select" id="fl-area"
-                                        onchange="resetAndFetch()"
-                                        style="width: 100%;"><option value
-                                            id="fl-area-all">All
-                                            areas</option><option>BKK</option><option>NORTH</option><option>NORTHEAST</option><option>WEST</option><option>EAST</option><option>SOUTH</option><option>Phuket-HRC</option><option>Phuket-OP</option><option>Samui-HRC</option><option>Samui-OP</option></select></div>
-                                <div style="width: 100%;"><select
-                                        class="filter-select" id="fl-pos"
-                                        onchange="handleFilterPosChange()"
-                                        style="width: 100%;"><option value>All
-                                            positions</option><option>CEO</option><option>CFO</option><option>OWNER</option><option>BARTENDER</option><option>F&amp;B
-                                            MANAGER</option><option>MANAGER</option><option
-                                            value="__other__">ETC — Please
-                                            Type</option></select><input
-                                        class="filter-select" type="text"
-                                        id="fl-pos-other"
-                                        data-i18n-placeholder="type_search_pos"
-                                        placeholder="Type to search position..."
-                                        oninput="debounceSearch()"
-                                        style="display: none; width: 100%; margin-top: 8px;"></div>
-                                <div id="fl-date-wrap"
-                                    style="display: flex; width: 100%; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--card-bg); overflow: hidden; align-items: stretch; transition: 0.2s;"><input
-                                        type="text" id="fl-date"
-                                        id="fl-date-input"
-                                        placeholder="Filter by date" data-input
-                                        style="flex: 1; border: none; outline: none; padding: 10px 14px; background: transparent; font-family: inherit; font-size: 13px; color: var(--text-main); width: 100%;"><button
-                                        type="button" title="Clear Date"
-                                        data-clear
-                                        style="background: transparent; border: none; border-left: 1px solid var(--border-light); cursor: pointer; color: var(--text-muted); padding: 0 14px; font-size: 14px; transition: 0.2s;"
-                                        onmouseover="this.style.color='var(--danger)'"
-                                        onmouseout="this.style.color='var(--text-muted)'">✕</button></div>
-                                <div style="width: 100%;"><input
-                                        class="filter-select" type="text"
-                                        id="fl-search"
-                                        data-i18n-placeholder="search_outlet"
-                                        placeholder="Search outlet..."
-                                        oninput="debounceSearch()"
-                                        style="width: 100%;"></div>
-                            </div>
-                            <div id="visit-list-loading"
-                                style="display: none;"><div
-                                    class="skeleton-card"><div
-                                        class="skeleton-header"><div
-                                            class="skeleton-title"></div><div
-                                            class="skeleton-date"></div></div><div
-                                        class="skeleton-meta"><div
-                                            class="skeleton-badge"></div><div
-                                            class="skeleton-text"></div></div><div
-                                        class="skeleton-body"></div></div><div
-                                    class="skeleton-card"><div
-                                        class="skeleton-header"><div
-                                            class="skeleton-title"></div><div
-                                            class="skeleton-date"></div></div><div
-                                        class="skeleton-meta"><div
-                                            class="skeleton-badge"></div><div
-                                            class="skeleton-text"></div></div><div
-                                        class="skeleton-body"></div></div><div
-                                    class="skeleton-card"><div
-                                        class="skeleton-header"><div
-                                            class="skeleton-title"></div><div
-                                            class="skeleton-date"></div></div><div
-                                        class="skeleton-meta"><div
-                                            class="skeleton-badge"></div><div
-                                            class="skeleton-text"></div></div><div
-                                        class="skeleton-body"></div></div></div>
-                            <div class="visit-list" id="visit-list"></div>
-                            <div id="pagination-container"
-                                style="margin: 20px 0 24px 0;"></div>
-                        </div>
-
-                        <div id="tab-calendar" style="display:none">
-                            <div
-                                style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-                                <div
-                                    style="display:flex; align-items:center; gap:16px; font-size:12px; color:var(--text-muted);">
-                                    <span
-                                        style="display:flex; align-items:center; gap:6px;"><span
-                                            style="width:12px; height:12px; border-radius:3px; background:#4CAF50; display:inline-block;"></span>
-                                        <span
-                                            data-i18n="legend_scheduled">Scheduled</span></span>
-                                    <span
-                                        style="display:flex; align-items:center; gap:6px;"><span
-                                            style="width:12px; height:12px; border-radius:3px; background:#E53935; display:inline-block;"></span>
-                                        <span data-i18n="legend_visit_rec">From
-                                            visit record</span></span>
-                                </div>
-                                <button class="btn-primary"
-                                    onclick="window.openAppointmentModal(null)"
-                                    style="padding:8px 16px; font-size:13px; border-radius:8px; display:flex; align-items:center; gap:6px;">
-                                    <svg width="14" height="14"
-                                        viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor"
-                                        stroke-width="2.5"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"><line x1="12"
-                                            y1="5"
-                                            x2="12" y2="19"></line><line x1="5"
-                                            y1="12" x2="19"
-                                            y2="12"></line></svg>
-                                    <span data-i18n="schedule_visit">Schedule
-                                        Visit</span>
-                                </button>
-                            </div>
-                            <div class="card" style="padding: 1rem;">
-                                <div id="calendar"></div>
-                            </div>
-                        </div>
-                    </main>
-                </div>
+    <div class="overlay" id="con-overlay">
+      <div class="modal-box modal-wide">
+        <div class="modal-head">
+          <div class="modal-head-title" id="con-modal-title">New Contract</div>
+          <button class="modal-close"
+            onclick="closeContractModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="con-id">
+          <div class="form-grid">
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Contract ID <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="con-code"
+                  placeholder="CON-2025-001">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Customer ID <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="con-customer"
+                  placeholder="CUST-001">
+              </div>
             </div>
-
-            <div class="camera-modal" id="camera-modal"><div
-                    class="camera-header"
-                    id="camera-header"><span id="modal-photo-counter"
-                        style="color: #FFF; font-weight: 500; font-size: 14px; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 12px;">0
-                        / 10</span><button class="btn-close-modal"
-                        onclick="stopCamera()">Done</button></div><div
-                    class="camera-body" id="camera-body"><video id="camera-view"
-                        autoplay playsinline></video></div><div
-                    class="camera-footer" id="camera-footer"><div
-                        class="camera-recent-thumb" id="camera-recent-thumb"
-                        onclick="openCameraGallery()"
-                        title="View Gallery"></div><button
-                        class="btn-capture-round"
-                        onclick="capturePhoto()"></button><div
-                        class="camera-spacer"><button class="btn-flip-camera"
-                            onclick="toggleCamera()" title="Switch Camera"><svg
-                                width="24" height="24" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"><polyline
-                                    points="1 4 1 10 7 10"></polyline><polyline
-                                    points="23 20 23 14 17 14"></polyline><path
-                                    d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10"></path><path
-                                    d="M3.51 15A9 9 0 0 0 18.36 18.36L23 14"></path></svg></button></div></div><canvas
-                    id="camera-canvas" style="display: none;"></canvas><div
-                    class="camera-gallery" id="camera-gallery"><div
-                        class="cg-header"><button class="btn-close-modal"
-                            onclick="closeCameraGallery()">◀ Back to
-                            Camera</button><div
-                            style="width:120px"></div></div><div
-                        class="cg-grid" id="cg-grid"></div></div></div>
-            <div class="detail-overlay" id="detail-overlay"
-                onclick="if(event.target===this)closeDetail()"><div
-                    class="detail-box"><button class="detail-close"
-                        onclick="closeDetail()">✕</button><div
-                        id="detail-content"></div></div></div>
-            <div class="confirm-overlay" id="save-confirm-overlay"
-                onclick="if(event.target===this)closeSaveConfirm()"><div
-                    class="confirm-box"
-                    style="padding: 1.5rem; max-width: 480px; position: relative;"><button
-                        class="detail-close" onclick="closeSaveConfirm()"
-                        style="position: absolute; top: 16px; right: 16px;">✕</button><h3
-                        style="margin-bottom: 1rem; color: var(--text-main); font-size: 16px; font-weight: 600;">Review
-                        Visit Details</h3><div id="save-confirm-text"
-                        style="margin-bottom: 1.5rem; text-align: left;"></div><div
-                        class="confirm-actions"
-                        id="save-confirm-actions"><button
-                            class="btn-secondary"
-                            onclick="enableModalEdit()"><span
-                                data-i18n="edit">Edit</span></button><button
-                            class="btn-primary" onclick="executeSave()"><span
-                                data-i18n="confirm_save">Confirm &
-                                Save</span></button></div></div></div>
-            <div class="confirm-overlay" id="delete-confirm-overlay"
-                onclick="if(event.target===this)closeDeleteRequest()"><div
-                    class="confirm-box"><h3
-                        style="margin-bottom: 12px; font-size: 18px; color: var(--danger);"><span
-                            data-i18n="delete_request">Delete
-                            Request</span></h3><p
-                        style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;"><span
-                            data-i18n="delete_reason">Reason for delete
-                            request:</span></p><textarea
-                        id="delete-reason-input"
-                        rows="3" placeholder="e.g., Duplicated entry..."
-                        style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid var(--border-light); border-radius: 6px; font-family: inherit; font-size: 14px; resize: none; background: var(--bg-color); color: var(--text-main);"></textarea><div
-                        class="confirm-actions"><button class="btn-secondary"
-                            onclick="closeDeleteRequest()"><span
-                                data-i18n="cancel">Cancel</span></button><button
-                            class="btn-primary btn-danger"
-                            onclick="executeDeleteRequest()"><span
-                                data-i18n="confirm_delete">Confirm
-                                Delete</span></button></div></div></div>
-            <div class="lightbox" id="lightbox" onclick="closeLightbox()"><img
-                    id="lb-img" src alt="Photo"></div>
-            <div class="toast" id="toast"></div>
-
-            <div id="appointment-modal" class="apt-modal-overlay">
-                <div class="apt-modal-box">
-                    <div class="apt-modal-header">
-                        <h3 id="apt-modal-title">Schedule Visit</h3>
-                        <button class="apt-close-btn"
-                            onclick="document.getElementById('appointment-modal').classList.remove('open')"
-                            title="Close">
-                            <svg width="20" height="20" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2.5"
-                                stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div class="apt-field apt-field-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--text-muted)" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                        <select id="apt-outlet-select"
-                            placeholder="Search outlet...">
-                            <option value>-- Select Outlet --</option>
-                        </select>
-                        <input type="hidden" id="apt-outlet-name" />
-                    </div>
-
-                    <div class="apt-field apt-field-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--text-muted)" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2"
-                                ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        <div style="display: flex; gap: 10px; flex: 1;">
-                            <div style="flex: 1;">
-                                <label
-                                    style="font-size: 11px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">START
-                                    DATE</label>
-                                <input id="apt-start-date" type="text"
-                                    data-i18n-placeholder="start_date"
-                                    placeholder="Start date" autocomplete="off"
-                                    style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 6px; font-family: inherit; font-size: 13px;" />
-                            </div>
-                            <div style="flex: 1;">
-                                <label
-                                    style="font-size: 11px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">END
-                                    DATE (OPTIONAL)</label>
-                                <input id="apt-end-date" type="text"
-                                    data-i18n-placeholder="end_date"
-                                    placeholder="End date" autocomplete="off"
-                                    style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 6px; font-family: inherit; font-size: 13px;" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="apt-field apt-field-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--text-muted)" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                        <div
-                            style="display:flex; align-items:center; gap:6px; flex:1; flex-wrap:wrap;">
-                            <span
-                                style="font-size:12px; color:var(--text-muted); min-width:34px;">Start</span>
-                            <select id="apt-hour" class="fp-time-select"
-                                onchange="autoSetEndTime()">
-                                <option value="06">06</option><option
-                                    value="07">07</option>
-                                <option value="08">08</option><option value="09"
-                                    selected>09</option>
-                                <option value="10">10</option><option
-                                    value="11">11</option>
-                                <option value="12">12</option><option
-                                    value="13">13</option>
-                                <option value="14">14</option><option
-                                    value="15">15</option>
-                                <option value="16">16</option><option
-                                    value="17">17</option>
-                                <option value="18">18</option><option
-                                    value="19">19</option>
-                                <option value="20">20</option><option
-                                    value="21">21</option>
-                                <option value="22">22</option>
-                            </select>
-                            <span
-                                style="font-weight:700; color:var(--text-muted);">:</span>
-                            <select id="apt-minute" class="fp-time-select"
-                                onchange="autoSetEndTime()">
-                                <option value="00" selected>00</option>
-                                <option value="15">15</option>
-                                <option value="30">30</option>
-                                <option value="45">45</option>
-                            </select>
-                            <span
-                                style="font-size:12px; color:var(--text-muted); margin-left:6px; min-width:28px;">End</span>
-                            <select id="apt-end-hour" class="fp-time-select">
-                                <option value="06">06</option><option
-                                    value="07">07</option>
-                                <option value="08">08</option><option
-                                    value="09">09</option>
-                                <option value="10" selected>10</option><option
-                                    value="11">11</option>
-                                <option value="12">12</option><option
-                                    value="13">13</option>
-                                <option value="14">14</option><option
-                                    value="15">15</option>
-                                <option value="16">16</option><option
-                                    value="17">17</option>
-                                <option value="18">18</option><option
-                                    value="19">19</option>
-                                <option value="20">20</option><option
-                                    value="21">21</option>
-                                <option value="22">22</option>
-                            </select>
-                            <span
-                                style="font-weight:700; color:var(--text-muted);">:</span>
-                            <select id="apt-end-minute" class="fp-time-select">
-                                <option value="00" selected>00</option>
-                                <option value="15">15</option>
-                                <option value="30">30</option>
-                                <option value="45">45</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="apt-field apt-field-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--text-muted)" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        <div
-                            style="display:flex; align-items:center; gap:8px; flex:1;">
-                            <span
-                                style="font-size:12px; color:var(--text-muted);"><span
-                                    data-i18n="remind_before">Remind
-                                    before</span></span>
-                            <select id="apt-remind-select"
-                                class="fp-time-select"
-                                style="flex:1;">
-                                <option value="0"><span
-                                        data-i18n="no_reminder">No
-                                        reminder</span></option>
-                                <option value="15">15 min</option>
-                                <option value="30" selected>30 min</option>
-                                <option value="60">1 hour</option>
-                                <option value="1440">1 day</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="apt-field apt-field-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--text-muted)" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="17" y1="10" x2="3" y2="10"></line>
-                            <line x1="21" y1="6" x2="3" y2="6"></line>
-                            <line x1="21" y1="14" x2="3" y2="14"></line>
-                            <line x1="17" y1="18" x2="3" y2="18"></line>
-                        </svg>
-                        <input id="apt-note" type="text"
-                            data-i18n-placeholder="note_optional"
-                            placeholder="Note (optional)" style="flex:1;" />
-                    </div>
-
-                    <div class="apt-modal-footer">
-                        <button id="btn-apt-delete" class="apt-btn-delete"
-                            onclick="deleteAppointment()" style="display:none;">
-                            <svg width="15" height="15" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path
-                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-                            </svg>
-                            <span data-i18n="delete">Delete</span>
-                        </button>
-                        <div style="display:flex; gap:8px; margin-left:auto;">
-                            <button class="apt-btn-cancel"
-                                onclick="document.getElementById('appointment-modal').classList.remove('open')"><span
-                                    data-i18n="cancel">Cancel</span></button>
-                            <button id="btn-apt-save" class="apt-btn-save"
-                                onclick="saveAppointment()"><span
-                                    data-i18n="save">Save</span></button>
-                        </div>
-                    </div>
-
-                    <input type="hidden" id="apt-title" value />
-                    <input type="hidden" id="apt-color" value="#4CAF50" />
-                    <input type="hidden" id="apt-remind" value="30" />
-                    <input type="hidden" id="apt-type" value="visit" />
-                    <input type="hidden" id="apt-location" value />
-                    <input type="hidden" id="apt-desc" value />
-                </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-input" id="con-start">
+              </div>
+              <div class="form-row">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-input" id="con-end">
+              </div>
             </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Contract Value</label>
+                <input type="number" class="form-input" id="con-value"
+                  placeholder="0">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Target</label>
+                <input type="number" class="form-input" id="con-target"
+                  placeholder="0">
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Contract Type</label>
+                <select class="form-input form-select" id="con-type">
+                  <option value="ANNUAL">Annual</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                  <option value="MONTHLY">Monthly</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label class="form-label">Period</label>
+                <input type="text" class="form-input" id="con-period"
+                  placeholder="e.g. Q1-2025">
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Brands</label>
+              <input type="text" class="form-input" id="con-brands"
+                placeholder="Brand A, Brand B...">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Principle</label>
+              <input type="text" class="form-input" id="con-principle"
+                placeholder="Principle name">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Promotion</label>
+              <input type="text" class="form-input" id="con-promotion"
+                placeholder="Promotion details">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline"
+            onclick="closeContractModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveContract()">Save
+            Contract</button>
+        </div>
+      </div>
+    </div>
 
-            <script
-                src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-            <script
-                src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-            <script
-                src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-            <script src="app.js"></script>
+    <div class="overlay" id="usr-overlay">
+      <div class="modal-box modal-wide">
+        <div class="modal-head">
+          <div class="modal-head-title" id="usr-modal-title">Add User</div>
+          <button class="modal-close"
+            onclick="closeUserModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="um-id">
+          <input type="hidden" id="um-users-id">
+          <div class="form-grid">
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">User ID <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="um-code"
+                  placeholder="Auto-generated" readonly
+                  style="background: rgba(0,0,0,0.05); cursor: not-allowed; font-weight: bold; color: var(--primary);">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Full Name <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="um-name"
+                  placeholder="John Doe">
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Username <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="um-username"
+                  placeholder="john_doe">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Email <span
+                    class="required">*</span></label>
+                <input type="email" class="form-input" id="um-email"
+                  placeholder="john@example.com">
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Team <span
+                    class="required">*</span></label>
+                <select class="form-input form-select" id="um-main-team"
+                  onchange="updateSubTeamDropdown(this.value)">
+                  <option value>-- Select Team --</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Horeca">Horeca</option>
+                  <option value="On Premise">On Premise</option>
+                  <option value="Southern">Southern</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label class="form-label">Area <span
+                    class="required">*</span></label>
+                <select class="form-input form-select" id="um-sub-team">
+                  <option value>-- Select Team First --</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Level / Position</label>
+                <input type="text" class="form-input" id="um-level"
+                  placeholder="Sale, Marketing, CEO...">
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Password <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="um-password"
+                  placeholder="Set a password">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Contact / Phone</label>
+                <input type="text" class="form-input" id="um-contact"
+                  placeholder="0812345678">
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Status</label>
+              <label class="checkbox-row" style="margin-top:8px;">
+                <input type="checkbox" id="um-active" checked>
+                <span>Account Active</span>
+              </label>
+            </div>
+            <div id="um-error" class="form-error" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline"
+            onclick="closeUserModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveUser()">Save
+            User</button>
+        </div>
+      </div>
+    </div>
 
-            <template id="visit-card-template">
-                <div class="visit-card" style="padding: 1.25rem;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 12px;">
-                        <div style="flex: 1;">
-                            <h3 class="tpl-outlet"
-                                style="font-size: 17px; font-weight: 700; color: var(--text-main); margin: 0; line-height: 1.3;"></h3>
-                            <span class="badge badge-area tpl-area"
-                                style="font-size: 9px; padding: 2px 8px; margin-top: 4px; opacity: 0.8;"></span>
-                        </div>
-                        <div
-                            style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                            <div class="vc-date tpl-date"
-                                style="font-size: 11px; font-weight: 600; color: var(--primary); white-space: nowrap;"></div>
-                            <div class="tpl-status-badge"></div>
-                        </div>
-                    </div>
-                    <div class="tpl-thumbs"
-                        style="margin-top: 8px; border-top: 1px solid var(--border-light); padding-top: 12px;"></div>
-                    <span class="tpl-person" style="display:none"></span><span
-                        class="tpl-pos" style="display:none"></span><div
-                        class="tpl-reason" style="display:none"></div>
-                </div>
-            </template>
-        </body>
-    </html>
+    <div class="overlay" id="prod-overlay">
+      <div class="modal-box modal-wide">
+        <div class="modal-head">
+          <div class="modal-head-title" id="prod-modal-title">Add Product</div>
+          <button class="modal-close"
+            onclick="closeProductModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="pm-id">
+          <div class="form-grid">
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Product ID <span
+                    class="required">*</span></label>
+                <input type="text" class="form-input" id="pm-code"
+                  placeholder="PROD-001">
+              </div>
+              <div class="form-row">
+                <label class="form-label">SKU</label>
+                <input type="text" class="form-input" id="pm-sku"
+                  placeholder="SKU code">
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Product Name <span
+                  class="required">*</span></label>
+              <input type="text" class="form-input" id="pm-name"
+                placeholder="Product Name">
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Brand</label>
+                <input type="text" class="form-input" id="pm-brand"
+                  placeholder="Brand">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Category</label>
+                <input type="text" class="form-input" id="pm-category"
+                  placeholder="Category">
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Unit</label>
+                <input type="text" class="form-input" id="pm-unit"
+                  placeholder="Bottle, Case, Box...">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Price</label>
+                <input type="number" class="form-input" id="pm-price"
+                  placeholder="0">
+              </div>
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Size</label>
+                <input type="text" class="form-input" id="pm-size"
+                  placeholder="700ml, 1L...">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Pack</label>
+                <input type="text" class="form-input" id="pm-pack"
+                  placeholder="12x1, 6x2...">
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Principle</label>
+              <input type="text" class="form-input" id="pm-principle"
+                placeholder="Principle / Supplier">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline"
+            onclick="closeProductModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveProduct()">Save
+            Product</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="price-overlay">
+      <div class="modal-box">
+        <div class="modal-head">
+          <div class="modal-head-title" id="price-modal-title">Add Price</div>
+          <button class="modal-close"
+            onclick="closePriceModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="prm-id">
+          <div class="form-grid">
+            <div class="form-row">
+              <label class="form-label">Price List ID <span
+                  class="required">*</span></label>
+              <input type="text" class="form-input" id="prm-code"
+                placeholder="PL-001">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Product ID <span
+                  class="required">*</span></label>
+              <input type="text" class="form-input" id="prm-product"
+                placeholder="PROD-001">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Price List Name</label>
+              <input type="text" class="form-input" id="prm-name"
+                placeholder="Standard, Premium...">
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="form-row">
+                <label class="form-label">Including VAT</label>
+                <input type="number" class="form-input" id="prm-inc"
+                  placeholder="0.00">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Excluding VAT</label>
+                <input type="number" class="form-input" id="prm-exc"
+                  placeholder="0.00">
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Rebate %</label>
+              <input type="number" class="form-input" id="prm-rebate"
+                placeholder="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline"
+            onclick="closePriceModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="savePrice()">Save
+            Price</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="act-overlay">
+      <div class="modal-box">
+        <div class="modal-head">
+          <div class="modal-head-title">Add Activity Log</div>
+          <button class="modal-close"
+            onclick="closeActivityModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-row">
+              <label class="form-label">Log ID <span
+                  class="required">*</span></label>
+              <input type="text" class="form-input" id="alm-id"
+                placeholder="LOG-001">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Customer ID <span
+                  class="required">*</span></label>
+              <input type="text" class="form-input" id="alm-customer"
+                placeholder="CUST-001">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Type</label>
+              <select class="form-input form-select" id="alm-type">
+                <option value="CALL">Call</option>
+                <option value="VISIT">Visit</option>
+                <option value="EMAIL">Email</option>
+                <option value="ORDER">Order</option>
+                <option value="COMPLAINT">Complaint</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Note</label>
+              <textarea class="form-input" id="alm-note" rows="3"
+                placeholder="Note details..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline"
+            onclick="closeActivityModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveActivity()">Save
+            Log</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="pw-overlay">
+      <div class="modal-box" style="max-width:340px;">
+        <div class="modal-head">
+          <div class="modal-head-title">User Password</div>
+          <button class="modal-close" onclick="closePwModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="pw-user-name"
+            style="font-weight:600;margin-bottom:10px;"></div>
+          <div
+            style="display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;">
+            <span id="pw-value"
+              style="font-family:'IBM Plex Mono',monospace;font-size:15px;flex:1;"></span>
+            <button class="btn btn-primary btn-sm"
+              onclick="copyPw()">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:390;display:none;"
+      id="detail-backdrop" onclick="closeDetail()"></div>
+    <div class="detail-panel" id="detail-panel">
+      <div class="detail-panel-head">
+        <button class="detail-back" onclick="closeDetail()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2"><polyline
+              points="15 18 9 12 15 6" /></svg>
+        </button>
+        <div>
+          <div style="font-size:15px;font-weight:700;" id="detail-title">Visit
+            Detail</div>
+          <div style="font-size:12px;color:var(--text-3);"
+            id="detail-sub"></div>
+        </div>
+      </div>
+      <div class="detail-body" id="detail-body"></div>
+    </div>
+
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+      <img id="lb-img" src alt>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="admin.js?v=6"></script>
+
+  </body>
+</html>
