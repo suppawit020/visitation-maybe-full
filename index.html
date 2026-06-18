@@ -3,10 +3,11 @@
 
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport"
+            content="width=device-width, initial-scale=1.0, viewport-fit=cover">
         <title>Visitation</title>
         <link rel="manifest" href="manifest.json">
-        <meta name="theme-color" content="#D32F2F">
+        <meta name="theme-color" content="#C41E24">
         <link rel="apple-touch-icon" href="icon.png">
         <link rel="stylesheet" href="style.css">
         <style>
@@ -36,8 +37,8 @@
             margin-top: 4px;
         }
         .ts-dropdown .option { padding: 10px 14px; }
-        .ts-dropdown .option:hover, .ts-dropdown .option.active { background: rgba(211,47,47,0.15); color: var(--text-main); }
-        .ts-dropdown .option.selected { background: rgba(211,47,47,0.25); }
+        .ts-dropdown .option:hover, .ts-dropdown .option.active { background: rgba(196,30,36,0.15); color: var(--text-main); }
+        .ts-dropdown .option.selected { background: rgba(196,30,36,0.25); }
         .ts-wrapper .ts-control input { color: var(--text-main); font-family: inherit; font-size: 14px; }
         .ts-wrapper .ts-control input::placeholder { color: var(--text-muted); }
         .ts-dropdown-content { max-height: 220px; }
@@ -105,11 +106,11 @@
         </div>
 
         <div id="login-screen"
-            style="display:flex; position:relative; align-items:center; justify-content:center; min-height:100vh; padding: 2rem;">
+            style="display:flex; position:relative; align-items:center; justify-content:center; min-height:100dvh; padding: 1.5rem;">
 
             <button id="theme-toggle-login" class="btn-icon"
                 onclick="toggleDarkMode()" title="Toggle Dark Mode"
-                style="position: absolute; top: 24px; right: 24px; background: var(--card-bg); border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 10; transition: all 0.3s ease;">
+                style="position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); background: var(--card-bg); border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 10; transition: all 0.3s ease;">
                 <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round"
@@ -194,7 +195,8 @@
                         <h1>Visitation</h1>
                     </div>
                     <div class="sidebar-nav tabs">
-                        <div class="tab active" data-tab="new" onclick="switchTab('new')">
+                        <div class="tab active" data-tab="new"
+                            onclick="switchTab('new')">
                             <svg width="18" height="18" viewBox="0 0 24 24"
                                 fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round"
@@ -206,7 +208,8 @@
                                     x1="9" y1="15" x2="15" y2="15"></line></svg>
                             <span data-i18n="nav_new_visit">New Visit</span>
                         </div>
-                        <div class="tab" data-tab="list" onclick="switchTab('list')">
+                        <div class="tab" data-tab="list"
+                            onclick="switchTab('list')">
                             <svg width="18" height="18" viewBox="0 0 24 24"
                                 fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round"
@@ -220,7 +223,8 @@
                                     y1="18" x2="3.01" y2="18"></line></svg>
                             <span data-i18n="nav_all_visits">All Visits</span>
                         </div>
-                        <div class="tab" data-tab="calendar" onclick="switchTab('calendar')">
+                        <div class="tab" data-tab="calendar"
+                            onclick="switchTab('calendar')">
                             <svg width="18" height="18" viewBox="0 0 24 24"
                                 fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round"
@@ -234,32 +238,63 @@
                             </svg>
                             <span data-i18n="nav_calendar">Calendar</span>
                         </div>
-                        <div class="tab" data-tab="outlet-master" onclick="switchTab('outlet-master')">
+                        <div class="tab" data-tab="outlet-master"
+                            onclick="switchTab('outlet-master')">
                             <svg width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2"
+                                fill="none" stroke="currentColor"
+                                stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round"
-                                style="margin-right: 8px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                style="margin-right: 8px;"><path
+                                    d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path
+                                    d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                             <span>Outlet Master</span>
                         </div>
-                        <div class="tab" data-tab="offtake" onclick="switchTab('offtake')">
+                        <div class="tab" data-tab="offtake"
+                            onclick="switchTab('offtake')">
                             <svg width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2"
+                                fill="none" stroke="currentColor"
+                                stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round"
-                                style="margin-right: 8px;"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"></path><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"></path></svg>
+                                style="margin-right: 8px;"><ellipse cx="12"
+                                    cy="5" rx="9" ry="3"></ellipse><path
+                                    d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"></path><path
+                                    d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"></path></svg>
                             <span>Off Take</span>
                         </div>
-                        <div class="center-form-nav-parent" id="visitation-center-form-nav" onclick="toggleVisitationCenterFormSubMenu()" style="display:flex;align-items:center;padding:12px 14px;color:var(--text-muted);cursor:pointer;border-radius:8px;">
+                        <div class="center-form-nav-parent"
+                            id="visitation-center-form-nav"
+                            onclick="toggleVisitationCenterFormSubMenu()"
+                            style="display:flex;align-items:center;padding:12px 14px;color:var(--text-muted);cursor:pointer;border-radius:8px;">
                             <svg width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2"
+                                fill="none" stroke="currentColor"
+                                stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round"
-                                style="margin-right: 8px;"><rect x="4" y="3" width="16" height="18" rx="2"></rect><line x1="8" y1="8" x2="16" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="8" y1="16" x2="13" y2="16"></line></svg>
-                            <span>Center Form</span><span id="visitation-center-form-arrow" style="margin-left:auto;transition:.2s;">›</span>
+                                style="margin-right: 8px;"><rect x="4" y="3"
+                                    width="16" height="18" rx="2"></rect><line
+                                    x1="8" y1="8" x2="16" y2="8"></line><line
+                                    x1="8" y1="12" x2="16" y2="12"></line><line
+                                    x1="8" y1="16" x2="13" y2="16"></line></svg>
+                            <span>Center Form</span><span
+                                id="visitation-center-form-arrow"
+                                style="margin-left:auto;transition:.2s;">›</span>
                         </div>
-                        <div id="visitation-center-form-submenu" style="display:none;padding:2px 0 8px 38px;">
-                            <button class="center-form-nav-sub active" type="button" data-section="off-take" onclick="openVisitationCenterFormSection('off-take');event.stopPropagation();">Off Take</button>
-                            <button class="center-form-nav-sub" type="button" data-section="claim-form" onclick="openVisitationCenterFormSection('claim-form');event.stopPropagation();">Claim Form</button>
-                            <button class="center-form-nav-sub" type="button" data-section="mkt-yearly-form" onclick="openVisitationCenterFormSection('mkt-yearly-form');event.stopPropagation();">MKT&amp;Yearly Form</button>
-                            <button class="center-form-nav-sub" type="button" data-section="presentation" onclick="openVisitationCenterFormSection('presentation');event.stopPropagation();">Presentation</button>
+                        <div id="visitation-center-form-submenu"
+                            style="display:none;padding:2px 0 8px 38px;">
+                            <button class="center-form-nav-sub active"
+                                type="button" data-section="off-take"
+                                onclick="openVisitationCenterFormSection('off-take');event.stopPropagation();">Off
+                                Take</button>
+                            <button class="center-form-nav-sub" type="button"
+                                data-section="claim-form"
+                                onclick="openVisitationCenterFormSection('claim-form');event.stopPropagation();">Claim
+                                Form</button>
+                            <button class="center-form-nav-sub" type="button"
+                                data-section="mkt-yearly-form"
+                                onclick="openVisitationCenterFormSection('mkt-yearly-form');event.stopPropagation();">MKT&amp;Yearly
+                                Form</button>
+                            <button class="center-form-nav-sub" type="button"
+                                data-section="presentation"
+                                onclick="openVisitationCenterFormSection('presentation');event.stopPropagation();">Presentation</button>
                         </div>
                     </div>
 
@@ -313,7 +348,7 @@
 
                 <main class="app-main">
                     <div class="header"
-                        style="position: relative; z-index: 100; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        style="position: relative; z-index: 100; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                         <div
                             style="display: flex; align-items: center; gap: 12px;">
                             <button class="btn-icon hamburger-btn"
@@ -781,213 +816,599 @@
                             </div>
                         </div>
 
-                        <div id="tab-offtake-simple-retired" style="display:none">
+                        <div id="tab-offtake-simple-retired"
+                            style="display:none">
                             <div class="card">
-                                <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                                <div class="section-title"
+                                    style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
                                     <span>New Off Take</span>
-                                    <span style="font-size:12px;color:var(--text-muted);font-weight:400;">Sent to OneAlchemy Admin</span>
+                                    <span
+                                        style="font-size:12px;color:var(--text-muted);font-weight:400;">Sent
+                                        to OneAlchemy Admin</span>
                                 </div>
-                                <form id="user-offtake-form" onsubmit="saveUserOffTake(event)">
+                                <form id="user-offtake-form"
+                                    onsubmit="saveUserOffTake(event)">
                                     <div class="form-grid">
                                         <div class="form-group full">
-                                            <label>Customer / Outlet <span class="req">*</span></label>
-                                            <select id="ot-outlet" required onchange="handleUserOffTakeOutletChange()">
-                                                <option value="">-- Select outlet --</option>
+                                            <label>Customer / Outlet <span
+                                                    class="req">*</span></label>
+                                            <select id="ot-outlet" required
+                                                onchange="handleUserOffTakeOutletChange()">
+                                                <option value>-- Select outlet
+                                                    --</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Received Month <span class="req">*</span></label>
-                                            <input id="ot-month" type="month" required>
+                                            <label>Received Month <span
+                                                    class="req">*</span></label>
+                                            <input id="ot-month" type="month"
+                                                required>
                                         </div>
                                         <div class="form-group">
-                                            <label>Wholesaler <span class="req">*</span></label>
-                                            <select id="ot-wholesaler" required><option value="">-- Select wholesaler --</option></select>
+                                            <label>Wholesaler <span
+                                                    class="req">*</span></label>
+                                            <select id="ot-wholesaler"
+                                                required><option value>-- Select
+                                                    wholesaler
+                                                    --</option></select>
                                         </div>
                                         <div class="form-group full">
-                                            <label>Product / SKU <span class="req">*</span></label>
-                                            <select id="ot-product" required onchange="handleUserOffTakeProductChange()">
-                                                <option value="">-- Select product --</option>
+                                            <label>Product / SKU <span
+                                                    class="req">*</span></label>
+                                            <select id="ot-product" required
+                                                onchange="handleUserOffTakeProductChange()">
+                                                <option value>-- Select product
+                                                    --</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Price Inc. VAT <span class="req">*</span></label>
-                                            <input id="ot-price-inc" type="number" min="0" step="0.01" required oninput="calculateUserOffTake('inc')">
+                                            <label>Price Inc. VAT <span
+                                                    class="req">*</span></label>
+                                            <input id="ot-price-inc"
+                                                type="number" min="0"
+                                                step="0.01" required
+                                                oninput="calculateUserOffTake('inc')">
                                         </div>
                                         <div class="form-group">
-                                            <label>Price Ex. VAT <span class="req">*</span></label>
-                                            <input id="ot-price-exc" type="number" min="0" step="0.01" required oninput="calculateUserOffTake('exc')">
+                                            <label>Price Ex. VAT <span
+                                                    class="req">*</span></label>
+                                            <input id="ot-price-exc"
+                                                type="number" min="0"
+                                                step="0.01" required
+                                                oninput="calculateUserOffTake('exc')">
                                         </div>
                                         <div class="form-group">
-                                            <label>Volume (Bottles) <span class="req">*</span></label>
-                                            <input id="ot-volume" type="number" min="1" step="1" required oninput="calculateUserOffTake()">
+                                            <label>Volume (Bottles) <span
+                                                    class="req">*</span></label>
+                                            <input id="ot-volume" type="number"
+                                                min="1" step="1" required
+                                                oninput="calculateUserOffTake()">
                                         </div>
                                         <div class="form-group">
-                                            <label>Rebate (%) <span class="req">*</span></label>
-                                            <input id="ot-rebate" type="number" min="0" step="0.01" value="25" required oninput="calculateUserOffTake()">
+                                            <label>Rebate (%) <span
+                                                    class="req">*</span></label>
+                                            <input id="ot-rebate" type="number"
+                                                min="0" step="0.01" value="25"
+                                                required
+                                                oninput="calculateUserOffTake()">
                                         </div>
                                     </div>
-                                    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px;">
-                                        <div style="padding:12px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-color);"><div style="font-size:11px;color:var(--text-muted);">Total Inc. VAT</div><strong id="ot-total-inc">0.00</strong></div>
-                                        <div style="padding:12px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-color);"><div style="font-size:11px;color:var(--text-muted);">Total Ex. VAT</div><strong id="ot-total-exc">0.00</strong></div>
-                                        <div style="padding:12px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-color);"><div style="font-size:11px;color:var(--text-muted);">Rebate</div><strong id="ot-total-rebate">0.00</strong></div>
+                                    <div
+                                        style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px;">
+                                        <div
+                                            style="padding:12px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-color);"><div
+                                                style="font-size:11px;color:var(--text-muted);">Total
+                                                Inc. VAT</div><strong
+                                                id="ot-total-inc">0.00</strong></div>
+                                        <div
+                                            style="padding:12px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-color);"><div
+                                                style="font-size:11px;color:var(--text-muted);">Total
+                                                Ex. VAT</div><strong
+                                                id="ot-total-exc">0.00</strong></div>
+                                        <div
+                                            style="padding:12px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-color);"><div
+                                                style="font-size:11px;color:var(--text-muted);">Rebate</div><strong
+                                                id="ot-total-rebate">0.00</strong></div>
                                     </div>
-                                    <div id="ot-form-status" style="display:none;margin-top:14px;padding:10px 12px;border-radius:8px;font-size:13px;"></div>
-                                    <div class="form-actions" style="margin-top:18px;">
-                                        <button class="btn-secondary" type="button" onclick="resetUserOffTakeForm()">Clear</button>
-                                        <button class="btn-primary" id="ot-save-btn" type="submit">Save Off Take</button>
+                                    <div id="ot-form-status"
+                                        style="display:none;margin-top:14px;padding:10px 12px;border-radius:8px;font-size:13px;"></div>
+                                    <div class="form-actions"
+                                        style="margin-top:18px;">
+                                        <button class="btn-secondary"
+                                            type="button"
+                                            onclick="resetUserOffTakeForm()">Clear</button>
+                                        <button class="btn-primary"
+                                            id="ot-save-btn" type="submit">Save
+                                            Off Take</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
 
-                        <div id="tab-data-center-simple-retired" style="display:none">
-                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
-                                <div style="font-size:13px;color:var(--text-muted);">Your Off Take records shared with OneAlchemy Admin</div>
-                                <button class="btn-secondary" type="button" onclick="loadUserDataCenter(true)">Refresh</button>
+                        <div id="tab-data-center-simple-retired"
+                            style="display:none">
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+                                <div
+                                    style="font-size:13px;color:var(--text-muted);">Your
+                                    Off Take records shared with OneAlchemy
+                                    Admin</div>
+                                <button class="btn-secondary" type="button"
+                                    onclick="loadUserDataCenter(true)">Refresh</button>
                             </div>
-                            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px;">
-                                <div class="card" style="margin:0;padding:16px;"><div style="font-size:12px;color:var(--text-muted);">Records</div><strong id="dc-record-count" style="font-size:24px;">0</strong></div>
-                                <div class="card" style="margin:0;padding:16px;"><div style="font-size:12px;color:var(--text-muted);">Volume (Btls.)</div><strong id="dc-volume-total" style="font-size:24px;">0</strong></div>
-                                <div class="card" style="margin:0;padding:16px;"><div style="font-size:12px;color:var(--text-muted);">Value Ex. VAT</div><strong id="dc-value-total" style="font-size:24px;">0.00</strong></div>
+                            <div
+                                style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px;">
+                                <div class="card"
+                                    style="margin:0;padding:16px;"><div
+                                        style="font-size:12px;color:var(--text-muted);">Records</div><strong
+                                        id="dc-record-count"
+                                        style="font-size:24px;">0</strong></div>
+                                <div class="card"
+                                    style="margin:0;padding:16px;"><div
+                                        style="font-size:12px;color:var(--text-muted);">Volume
+                                        (Btls.)</div><strong
+                                        id="dc-volume-total"
+                                        style="font-size:24px;">0</strong></div>
+                                <div class="card"
+                                    style="margin:0;padding:16px;"><div
+                                        style="font-size:12px;color:var(--text-muted);">Value
+                                        Ex. VAT</div><strong id="dc-value-total"
+                                        style="font-size:24px;">0.00</strong></div>
                             </div>
                             <div class="card">
-                                <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:14px;">
-                                    <input id="dc-search" type="search" placeholder="Search outlet, SKU, product, wholesaler..." oninput="renderUserDataCenter()">
-                                    <input id="dc-month" type="month" onchange="renderUserDataCenter()">
+                                <div
+                                    style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:14px;">
+                                    <input id="dc-search" type="search"
+                                        placeholder="Search outlet, SKU, product, wholesaler..."
+                                        oninput="renderUserDataCenter()">
+                                    <input id="dc-month" type="month"
+                                        onchange="renderUserDataCenter()">
                                 </div>
                                 <div style="overflow-x:auto;">
-                                    <table style="width:100%;border-collapse:collapse;min-width:820px;font-size:12px;">
-                                        <thead><tr style="text-align:left;border-bottom:1px solid var(--border-light);">
-                                            <th style="padding:10px 8px;">Month</th><th style="padding:10px 8px;">Outlet</th><th style="padding:10px 8px;">Wholesaler</th><th style="padding:10px 8px;">SKU / Product</th><th style="padding:10px 8px;text-align:right;">Btls.</th><th style="padding:10px 8px;text-align:right;">Ex. VAT</th><th style="padding:10px 8px;text-align:right;">Rebate</th>
-                                        </tr></thead>
-                                        <tbody id="dc-table-body"><tr><td colspan="7" style="padding:28px;text-align:center;color:var(--text-muted);">Open Data Center to load records.</td></tr></tbody>
+                                    <table
+                                        style="width:100%;border-collapse:collapse;min-width:820px;font-size:12px;">
+                                        <thead><tr
+                                                style="text-align:left;border-bottom:1px solid var(--border-light);">
+                                                <th
+                                                    style="padding:10px 8px;">Month</th><th
+                                                    style="padding:10px 8px;">Outlet</th><th
+                                                    style="padding:10px 8px;">Wholesaler</th><th
+                                                    style="padding:10px 8px;">SKU
+                                                    / Product</th><th
+                                                    style="padding:10px 8px;text-align:right;">Btls.</th><th
+                                                    style="padding:10px 8px;text-align:right;">Ex.
+                                                    VAT</th><th
+                                                    style="padding:10px 8px;text-align:right;">Rebate</th>
+                                            </tr></thead>
+                                        <tbody id="dc-table-body"><tr><td
+                                                    colspan="7"
+                                                    style="padding:28px;text-align:center;color:var(--text-muted);">Open
+                                                    Data Center to load
+                                                    records.</td></tr></tbody>
                                     </table>
                                 </div>
-                                <div id="dc-table-info" style="margin-top:12px;font-size:12px;color:var(--text-muted);"></div>
+                                <div id="dc-table-info"
+                                    style="margin-top:12px;font-size:12px;color:var(--text-muted);"></div>
                             </div>
                         </div>
 
                         <!-- Outlet Master: lifted from OneAlchemy -->
-                        <div id="tab-outlet-master-simple-retired" style="display:none">
+                        <div id="tab-outlet-master-simple-retired"
+                            style="display:none">
                             <div class="page-heading center-form-page-heading">
-                                <div><h1 class="page-title">Outlet Master</h1><p class="page-subtitle">Browse outlet records from Supabase</p></div>
-                                <button class="btn-secondary" type="button" onclick="loadVisitationOutletMaster(true)">Refresh Data</button>
+                                <div><h1 class="page-title">Outlet Master</h1><p
+                                        class="page-subtitle">Browse outlet
+                                        records from Supabase</p></div>
+                                <button class="btn-secondary" type="button"
+                                    onclick="loadVisitationOutletMaster(true)">Refresh
+                                    Data</button>
                             </div>
-                            <div class="toolbar" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-                                <input id="vom-search" type="search" placeholder="Search code, outlet, group, BDE, province..." oninput="renderVisitationOutletMaster()" style="flex:1;min-width:260px;">
-                                <select id="vom-status" onchange="renderVisitationOutletMaster()" style="min-width:150px;"><option value="">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+                            <div class="toolbar"
+                                style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+                                <input id="vom-search" type="search"
+                                    placeholder="Search code, outlet, group, BDE, province..."
+                                    oninput="renderVisitationOutletMaster()"
+                                    style="flex:1;min-width:260px;">
+                                <select id="vom-status"
+                                    onchange="renderVisitationOutletMaster()"
+                                    style="min-width:150px;"><option value>All
+                                        Status</option><option
+                                        value="active">Active</option><option
+                                        value="inactive">Inactive</option></select>
                             </div>
-                            <div class="card" style="padding:0;overflow:hidden;">
+                            <div class="card"
+                                style="padding:0;overflow:hidden;">
                                 <div style="overflow:auto;max-height:68vh;">
-                                    <table class="onealchemy-data-table" style="min-width:1500px;">
-                                        <thead><tr><th>Customer ID</th><th>Outlet Code</th><th>Outlet Name</th><th>Company Name</th><th>Group</th><th>Team</th><th>BDE</th><th>Area</th><th>Province</th><th>Region</th><th>Outlet Type</th><th>Segmentation</th><th>Status</th></tr></thead>
-                                        <tbody id="vom-tbody"><tr><td colspan="13" class="table-empty-cell">Open Outlet Master to load data.</td></tr></tbody>
+                                    <table class="onealchemy-data-table"
+                                        style="min-width:1500px;">
+                                        <thead><tr><th>Customer
+                                                    ID</th><th>Outlet
+                                                    Code</th><th>Outlet
+                                                    Name</th><th>Company
+                                                    Name</th><th>Group</th><th>Team</th><th>BDE</th><th>Area</th><th>Province</th><th>Region</th><th>Outlet
+                                                    Type</th><th>Segmentation</th><th>Status</th></tr></thead>
+                                        <tbody id="vom-tbody"><tr><td
+                                                    colspan="13"
+                                                    class="table-empty-cell">Open
+                                                    Outlet Master to load
+                                                    data.</td></tr></tbody>
                                     </table>
                                 </div>
-                                <div class="onealchemy-table-footer" id="vom-info">0 outlets</div>
+                                <div class="onealchemy-table-footer"
+                                    id="vom-info">0 outlets</div>
                             </div>
                         </div>
 
                         <!-- Off Take data table: lifted from OneAlchemy -->
-                        <div id="tab-offtake-table-retired" style="display:none">
+                        <div id="tab-offtake-table-retired"
+                            style="display:none">
                             <div class="page-heading center-form-page-heading">
-                                <div><h1 class="page-title">Off Take</h1><p class="page-subtitle">Browse off-take records from Supabase</p></div>
-                                <button class="btn-secondary" type="button" onclick="loadVisitationOffTake(true)">Refresh Data</button>
+                                <div><h1 class="page-title">Off Take</h1><p
+                                        class="page-subtitle">Browse off-take
+                                        records from Supabase</p></div>
+                                <button class="btn-secondary" type="button"
+                                    onclick="loadVisitationOffTake(true)">Refresh
+                                    Data</button>
                             </div>
-                            <div class="toolbar off-take-toolbar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:14px;">
-                                <input id="vot-search" type="search" placeholder="Search outlet, wholesaler, SKU, brand, product..." oninput="renderVisitationOffTake()" style="flex:1;min-width:280px;">
-                                <select id="vot-year" onchange="renderVisitationOffTake()"><option value="">All Years</option></select>
-                                <select id="vot-month" onchange="renderVisitationOffTake()"><option value="">All Months</option></select>
-                                <select id="vot-wholesaler" onchange="renderVisitationOffTake()"><option value="">All Wholesalers</option></select>
-                                <select id="vot-principle" onchange="renderVisitationOffTake()"><option value="">All Principles</option></select>
-                                <select id="vot-category" onchange="renderVisitationOffTake()"><option value="">All Categories</option></select>
+                            <div class="toolbar off-take-toolbar"
+                                style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:14px;">
+                                <input id="vot-search" type="search"
+                                    placeholder="Search outlet, wholesaler, SKU, brand, product..."
+                                    oninput="renderVisitationOffTake()"
+                                    style="flex:1;min-width:280px;">
+                                <select id="vot-year"
+                                    onchange="renderVisitationOffTake()"><option
+                                        value>All Years</option></select>
+                                <select id="vot-month"
+                                    onchange="renderVisitationOffTake()"><option
+                                        value>All Months</option></select>
+                                <select id="vot-wholesaler"
+                                    onchange="renderVisitationOffTake()"><option
+                                        value>All Wholesalers</option></select>
+                                <select id="vot-principle"
+                                    onchange="renderVisitationOffTake()"><option
+                                        value>All Principles</option></select>
+                                <select id="vot-category"
+                                    onchange="renderVisitationOffTake()"><option
+                                        value>All Categories</option></select>
                             </div>
-                            <div class="card" style="padding:0;overflow:hidden;">
+                            <div class="card"
+                                style="padding:0;overflow:hidden;">
                                 <div style="overflow:auto;max-height:68vh;">
-                                    <table class="onealchemy-data-table" style="min-width:2500px;">
-                                        <thead><tr><th>Code</th><th>Outlets</th><th>Group</th><th>Current Team</th><th>Current BDE</th><th>BDE</th><th>Area</th><th>Wholesaler</th><th>SKU Company</th><th>SKU Code</th><th>Principle</th><th>Category</th><th>Brand</th><th>Product</th><th>Size</th><th>Packing</th><th>Price Inc. VAT</th><th>Price Ex. VAT</th><th>Vol. (Btls.)</th><th>Rebate (%)</th><th>Total Price Inc. VAT</th><th>Total Price Ex. VAT</th><th>Total Rebate</th><th>Received Month</th><th>Liter</th></tr></thead>
-                                        <tbody id="vot-tbody"><tr><td colspan="25" class="table-empty-cell">Open Off Take to load data.</td></tr></tbody>
+                                    <table class="onealchemy-data-table"
+                                        style="min-width:2500px;">
+                                        <thead><tr><th>Code</th><th>Outlets</th><th>Group</th><th>Current
+                                                    Team</th><th>Current
+                                                    BDE</th><th>BDE</th><th>Area</th><th>Wholesaler</th><th>SKU
+                                                    Company</th><th>SKU
+                                                    Code</th><th>Principle</th><th>Category</th><th>Brand</th><th>Product</th><th>Size</th><th>Packing</th><th>Price
+                                                    Inc. VAT</th><th>Price Ex.
+                                                    VAT</th><th>Vol.
+                                                    (Btls.)</th><th>Rebate
+                                                    (%)</th><th>Total Price Inc.
+                                                    VAT</th><th>Total Price Ex.
+                                                    VAT</th><th>Total
+                                                    Rebate</th><th>Received
+                                                    Month</th><th>Liter</th></tr></thead>
+                                        <tbody id="vot-tbody"><tr><td
+                                                    colspan="25"
+                                                    class="table-empty-cell">Open
+                                                    Off Take to load
+                                                    data.</td></tr></tbody>
                                     </table>
                                 </div>
-                                <div class="onealchemy-table-footer" id="vot-info">0 off-take rows</div>
+                                <div class="onealchemy-table-footer"
+                                    id="vot-info">0 off-take rows</div>
                             </div>
                         </div>
 
                         <!-- Exact OneAlchemy Outlet Master -->
                         <div id="tab-outlet-master" style="display:none">
-                            <div class="page-heading"><div><h1 class="page-title">Outlet Master</h1><p class="page-subtitle">Browse the outlet records assigned to you</p></div></div>
-                            <div class="toolbar outlet-master-toolbar" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;">
-                                <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:260px;max-width:420px;">
-                                    <div class="status-pills"><div class="status-pill status-pill--active"><span class="status-pill__dot"></span><span class="status-pill__label">With Contract</span><span id="outlet-master-with-contract" class="status-pill__count">0</span></div><div class="status-pill status-pill--inactive"><span class="status-pill__dot"></span><span class="status-pill__label">No Contract</span><span id="outlet-master-no-contract" class="status-pill__count">0</span></div><div class="status-pill status-pill--total"><span class="status-pill__label">Total</span><span id="outlet-master-total" class="status-pill__count">0</span></div></div>
-                                    <div class="search-wrap" style="width:100%;max-width:100%;flex:none;"><i class="icon">⌕</i><input type="text" id="outlet-master-search" class="search-input" placeholder="Search outlet, company, BDE, province, contract..." oninput="renderVisitationOutletMasterExact()"></div>
-                                </div>
-                                <select id="outlet-master-team-filter" class="filter-select outlet-master-filter-select" onchange="renderVisitationOutletMasterExact()"><option value="">All Teams</option></select>
-                                <select id="outlet-master-bde-filter" class="filter-select outlet-master-filter-select outlet-master-filter-select--wide" onchange="renderVisitationOutletMasterExact()"><option value="">All BDEs</option></select>
-                                <select id="outlet-master-region-filter" class="filter-select outlet-master-filter-select" onchange="renderVisitationOutletMasterExact()"><option value="">All Regions</option></select>
-                                <select id="outlet-master-province-filter" class="filter-select outlet-master-filter-select" onchange="renderVisitationOutletMasterExact()"><option value="">All Provinces</option></select>
-                                <div class="contract-toolbar-right outlet-master-toolbar-right"><button class="btn-secondary" type="button" onclick="exportVisitationOutletMasterToExcel()">⇧ Export Excel</button></div>
+                            <div class="page-heading"><div><h1
+                                        class="page-title">Outlet Master</h1><p
+                                        class="page-subtitle">Browse the outlet
+                                        records assigned to you</p></div></div>
+                            <div class="data-page-summary"><div
+                                    class="status-pills"><div
+                                        class="status-pill status-pill--active"><span
+                                            class="status-pill__dot"></span><span
+                                            class="status-pill__label">With
+                                            Contract</span><span
+                                            id="outlet-master-with-contract"
+                                            class="status-pill__count">0</span></div><div
+                                        class="status-pill status-pill--inactive"><span
+                                            class="status-pill__dot"></span><span
+                                            class="status-pill__label">No
+                                            Contract</span><span
+                                            id="outlet-master-no-contract"
+                                            class="status-pill__count">0</span></div><div
+                                        class="status-pill status-pill--total"><span
+                                            class="status-pill__label">Total</span><span
+                                            id="outlet-master-total"
+                                            class="status-pill__count">0</span></div></div></div>
+                            <div class="toolbar outlet-master-toolbar">
+                                <div class="search-wrap"><i class="icon"
+                                        aria-hidden="true"><svg width="17"
+                                            height="17" viewBox="0 0 24 24"
+                                            fill="none" stroke="currentColor"
+                                            stroke-width="2"><circle cx="11"
+                                                cy="11" r="8"></circle><line
+                                                x1="21" y1="21" x2="16.65"
+                                                y2="16.65"></line></svg></i><input
+                                        type="text" id="outlet-master-search"
+                                        class="search-input"
+                                        placeholder="Search outlet, company, BDE, province, contract..."
+                                        oninput="renderVisitationOutletMasterExact()"></div>
+                                <select id="outlet-master-team-filter"
+                                    class="filter-select outlet-master-filter-select"
+                                    onchange="renderVisitationOutletMasterExact()"><option
+                                        value>All Teams</option></select>
+                                <select id="outlet-master-bde-filter"
+                                    class="filter-select outlet-master-filter-select outlet-master-filter-select--wide"
+                                    onchange="renderVisitationOutletMasterExact()"><option
+                                        value>All BDEs</option></select>
+                                <select id="outlet-master-region-filter"
+                                    class="filter-select outlet-master-filter-select"
+                                    onchange="renderVisitationOutletMasterExact()"><option
+                                        value>All Regions</option></select>
+                                <select id="outlet-master-province-filter"
+                                    class="filter-select outlet-master-filter-select"
+                                    onchange="renderVisitationOutletMasterExact()"><option
+                                        value>All Provinces</option></select>
                             </div>
-                            <div class="quick-filter-banner" id="outlet-master-filter-banner" style="display:none;"><div class="quick-filter-content"><strong id="outlet-master-filter-title">Filtered View</strong><span id="outlet-master-filter-count"></span><button class="btn-secondary quick-filter-clear" type="button" onclick="clearVisitationOutletMasterFilters()">Clear</button></div></div>
-                            <div class="table-card outlet-master-list"><div class="table-wrap outlet-master-table-wrap"><table class="outlet-master-table"><thead><tr><th class="col-no outlet-col-no"><span class="outlet-th-label">NO.</span></th><th class="outlet-col-code"><span class="outlet-th-label">OUTLET CODE</span></th><th class="outlet-col-name"><span class="outlet-th-label">OUTLET NAME</span></th><th class="outlet-col-company"><span class="outlet-th-label">COMPANY</span></th><th class="outlet-col-bde"><span class="outlet-th-label">BDE</span></th><th class="outlet-col-province"><span class="outlet-th-label">PROVINCE</span></th><th class="outlet-col-region"><span class="outlet-th-label">REGION</span></th><th class="outlet-col-seg"><span class="outlet-th-label">ALCHEMY TYPE</span></th><th class="outlet-col-seg"><span class="outlet-th-label">ALCHEMY SUB TYPE</span></th><th class="outlet-col-seg-sm"><span class="outlet-th-label">IMG</span></th><th class="outlet-col-seg-sm"><span class="outlet-th-label">VOL</span></th><th class="outlet-col-seg-sm"><span class="outlet-th-label">SEG</span></th><th class="outlet-col-seg"><span class="outlet-th-label">CAMPARI (NEW)</span></th><th class="outlet-col-seg"><span class="outlet-th-label">CAMPARI (OLD)</span></th><th class="outlet-col-seg"><span class="outlet-th-label">TEG SEG</span></th><th class="outlet-col-seg-sm"><span class="outlet-th-label">TEG GRADE</span></th><th class="outlet-col-seg"><span class="outlet-th-label">RC SUB TYPE</span></th><th class="outlet-col-seg-sm"><span class="outlet-th-label">RC IMG</span></th><th class="outlet-col-seg"><span class="outlet-th-label">PRIMARY CONTRACT</span></th><th class="outlet-col-contract"><span class="outlet-th-label">CONTRACT</span></th></tr></thead><tbody id="outlet-master-tbody"><tr><td colspan="20" class="wine-loading-placeholder">Loading outlet data...</td></tr></tbody></table></div><div class="table-footer"><div class="page-info" id="outlet-master-info">Loading outlets...</div><div id="outlet-master-pagination"></div></div></div>
+                            <div class="quick-filter-banner"
+                                id="outlet-master-filter-banner"
+                                style="display:none;"><div
+                                    class="quick-filter-content"><strong
+                                        id="outlet-master-filter-title">Filtered
+                                        View</strong><span
+                                        id="outlet-master-filter-count"></span><button
+                                        class="btn-secondary quick-filter-clear"
+                                        type="button"
+                                        onclick="clearVisitationOutletMasterFilters()">Clear</button></div></div>
+                            <div class="table-card outlet-master-list"><div
+                                    class="table-wrap outlet-master-table-wrap"><table
+                                        class="outlet-master-table"><thead><tr><th
+                                                    class="col-no outlet-col-no"><span
+                                                        class="outlet-th-label">NO.</span></th><th
+                                                    class="outlet-col-code"><span
+                                                        class="outlet-th-label">OUTLET
+                                                        CODE</span></th><th
+                                                    class="outlet-col-name"><span
+                                                        class="outlet-th-label">OUTLET
+                                                        NAME</span></th><th
+                                                    class="outlet-col-company"><span
+                                                        class="outlet-th-label">COMPANY</span></th><th
+                                                    class="outlet-col-bde"><span
+                                                        class="outlet-th-label">BDE</span></th><th
+                                                    class="outlet-col-province"><span
+                                                        class="outlet-th-label">PROVINCE</span></th><th
+                                                    class="outlet-col-region"><span
+                                                        class="outlet-th-label">REGION</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">ALCHEMY
+                                                        TYPE</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">ALCHEMY
+                                                        SUB TYPE</span></th><th
+                                                    class="outlet-col-seg-sm"><span
+                                                        class="outlet-th-label">IMG</span></th><th
+                                                    class="outlet-col-seg-sm"><span
+                                                        class="outlet-th-label">VOL</span></th><th
+                                                    class="outlet-col-seg-sm"><span
+                                                        class="outlet-th-label">SEG</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">CAMPARI
+                                                        (NEW)</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">CAMPARI
+                                                        (OLD)</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">TEG
+                                                        SEG</span></th><th
+                                                    class="outlet-col-seg-sm"><span
+                                                        class="outlet-th-label">TEG
+                                                        GRADE</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">RC
+                                                        SUB TYPE</span></th><th
+                                                    class="outlet-col-seg-sm"><span
+                                                        class="outlet-th-label">RC
+                                                        IMG</span></th><th
+                                                    class="outlet-col-seg"><span
+                                                        class="outlet-th-label">PRIMARY
+                                                        CONTRACT</span></th><th
+                                                    class="outlet-col-contract"><span
+                                                        class="outlet-th-label">CONTRACT</span></th></tr></thead><tbody
+                                            id="outlet-master-tbody"><tr><td
+                                                    colspan="20"
+                                                    class="wine-loading-placeholder">Loading
+                                                    outlet
+                                                    data...</td></tr></tbody></table></div><div
+                                    class="table-footer"><div class="page-info"
+                                        id="outlet-master-info">Loading
+                                        outlets...</div><div
+                                        id="outlet-master-pagination"></div></div></div>
                         </div>
 
                         <!-- Exact OneAlchemy Off Take data table -->
                         <div id="tab-offtake" style="display:none">
-                            <div class="page-heading"><div><h1 class="page-title">Off Take</h1><p class="page-subtitle">Browse, import, and export off-take records from Supabase</p></div></div>
-                            <div class="toolbar off-take-toolbar" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;">
-                                <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:260px;max-width:440px;"><div class="status-pills"><div class="status-pill status-pill--total"><span class="status-pill__label">Total</span><span id="off-take-total-count" class="status-pill__count">0</span></div></div><div class="search-wrap" style="width:100%;max-width:100%;flex:none;"><i class="icon">⌕</i><input type="text" id="off-take-search" class="search-input" placeholder="Search outlet, wholesaler, SKU, brand, product..." oninput="renderVisitationOffTakeExact()"></div></div>
-                                <select id="off-take-year-filter" class="filter-select off-take-filter-select" onchange="renderVisitationOffTakeExact()"><option value="">All Years</option></select><select id="off-take-month-filter" class="filter-select off-take-filter-select" onchange="renderVisitationOffTakeExact()"><option value="">All Months</option></select><select id="off-take-wholesaler-filter" class="filter-select off-take-filter-select off-take-filter-select--wide" onchange="renderVisitationOffTakeExact()"><option value="">All Wholesalers</option></select><select id="off-take-principle-filter" class="filter-select off-take-filter-select" onchange="renderVisitationOffTakeExact()"><option value="">All Principles</option></select><select id="off-take-category-filter" class="filter-select off-take-filter-select" onchange="renderVisitationOffTakeExact()"><option value="">All Categories</option></select>
-                                <button class="btn-primary admin-only-control" type="button" onclick="openVisitationOffTakeForm()">＋ Add New Off Take</button>
-                                <div class="contract-toolbar-right off-take-toolbar-right"><input type="file" id="off-take-import-file-input" accept=".csv,.xlsx" hidden onchange="handleVisitationOffTakeImportFile(event)"><div class="excel-action-stack off-take-excel-actions"><button class="btn-secondary btn-import-neutral admin-only-control" type="button" onclick="document.getElementById('off-take-import-file-input').click()">⇩ Import CSV/Excel</button><button class="btn-secondary" type="button" onclick="exportVisitationOffTakeToExcel()">⇧ Export Excel</button></div></div>
+                            <div class="page-heading"><div><h1
+                                        class="page-title">Off Take</h1><p
+                                        class="page-subtitle">Browse off-take
+                                        records from Supabase</p></div></div>
+                            <div class="data-page-summary"><div
+                                    class="status-pills"><div
+                                        class="status-pill status-pill--total"><span
+                                            class="status-pill__label">Total</span><span
+                                            id="off-take-total-count"
+                                            class="status-pill__count">0</span></div></div></div>
+                            <div class="toolbar off-take-toolbar">
+                                <div class="search-wrap"><i class="icon"
+                                        aria-hidden="true"><svg width="17"
+                                            height="17" viewBox="0 0 24 24"
+                                            fill="none" stroke="currentColor"
+                                            stroke-width="2"><circle cx="11"
+                                                cy="11" r="8"></circle><line
+                                                x1="21" y1="21" x2="16.65"
+                                                y2="16.65"></line></svg></i><input
+                                        type="text" id="off-take-search"
+                                        class="search-input"
+                                        placeholder="Search outlet, wholesaler, SKU, brand, product..."
+                                        oninput="renderVisitationOffTakeExact()"></div>
+                                <select id="off-take-year-filter"
+                                    class="filter-select off-take-filter-select"
+                                    onchange="renderVisitationOffTakeExact()"><option
+                                        value>All Years</option></select><select
+                                    id="off-take-month-filter"
+                                    class="filter-select off-take-filter-select"
+                                    onchange="renderVisitationOffTakeExact()"><option
+                                        value>All
+                                        Months</option></select><select
+                                    id="off-take-wholesaler-filter"
+                                    class="filter-select off-take-filter-select off-take-filter-select--wide"
+                                    onchange="renderVisitationOffTakeExact()"><option
+                                        value>All
+                                        Wholesalers</option></select><select
+                                    id="off-take-principle-filter"
+                                    class="filter-select off-take-filter-select"
+                                    onchange="renderVisitationOffTakeExact()"><option
+                                        value>All
+                                        Principles</option></select><select
+                                    id="off-take-category-filter"
+                                    class="filter-select off-take-filter-select"
+                                    onchange="renderVisitationOffTakeExact()"><option
+                                        value>All Categories</option></select>
+                                <button class="btn-primary admin-only-control"
+                                    type="button"
+                                    onclick="openVisitationOffTakeForm()">＋ Add
+                                    New Off Take</button>
                             </div>
-                            <div class="quick-filter-banner" id="off-take-filter-banner" style="display:none;"><div class="quick-filter-content"><strong>Filtered View</strong><span id="off-take-filter-count"></span><button class="btn-secondary quick-filter-clear" type="button" onclick="clearVisitationOffTakeFilters()">Clear</button></div></div>
-                            <div class="table-card off-take-list"><div class="table-wrap off-take-table-wrap"><table class="off-take-table"><thead><tr><th>Code</th><th>Outlets</th><th>Group</th><th>Current Team</th><th>Current BDE</th><th>BDE</th><th>Area</th><th>Wholesaler</th><th>SKU Company</th><th>SKU Code</th><th>Principle</th><th>Category</th><th>Brand</th><th>Product</th><th>Size</th><th>Packing</th><th>Price Inc. VAT</th><th>Price Ex. VAT</th><th>Vol. (Btls.)</th><th>Rebate (%)</th><th>Total Price Inc.VAT</th><th>Total Price Exc.VAT</th><th>Total Rebate</th><th>Received Month</th><th>Liter</th><th class="col-actions">ACTIONS</th></tr></thead><tbody id="off-take-tbody"><tr><td colspan="26" class="wine-loading-placeholder">Loading off-take data...</td></tr></tbody></table></div><div class="table-footer"><div class="page-info" id="off-take-info">No off-take data yet.</div><div id="off-take-pagination"></div></div></div>
+                            <div class="quick-filter-banner"
+                                id="off-take-filter-banner"
+                                style="display:none;"><div
+                                    class="quick-filter-content"><strong>Filtered
+                                        View</strong><span
+                                        id="off-take-filter-count"></span><button
+                                        class="btn-secondary quick-filter-clear"
+                                        type="button"
+                                        onclick="clearVisitationOffTakeFilters()">Clear</button></div></div>
+                            <div class="table-card off-take-list"><div
+                                    class="table-wrap off-take-table-wrap"><table
+                                        class="off-take-table"><thead><tr><th>Code</th><th>Outlets</th><th>Group</th><th>Current
+                                                    Team</th><th>Current
+                                                    BDE</th><th>BDE</th><th>Area</th><th>Wholesaler</th><th>SKU
+                                                    Company</th><th>SKU
+                                                    Code</th><th>Principle</th><th>Category</th><th>Brand</th><th>Product</th><th>Size</th><th>Packing</th><th>Price
+                                                    Inc. VAT</th><th>Price Ex.
+                                                    VAT</th><th>Vol.
+                                                    (Btls.)</th><th>Rebate
+                                                    (%)</th><th>Total Price
+                                                    Inc.VAT</th><th>Total Price
+                                                    Exc.VAT</th><th>Total
+                                                    Rebate</th><th>Received
+                                                    Month</th><th>Liter</th><th
+                                                    class="col-actions">ACTIONS</th></tr></thead><tbody
+                                            id="off-take-tbody"><tr><td
+                                                    colspan="26"
+                                                    class="wine-loading-placeholder">Loading
+                                                    off-take
+                                                    data...</td></tr></tbody></table></div><div
+                                    class="table-footer"><div class="page-info"
+                                        id="off-take-info">No off-take data
+                                        yet.</div><div
+                                        id="off-take-pagination"></div></div></div>
                         </div>
 
                         <!-- Center Form > Off Take: lifted from OneAlchemy -->
                         <div id="tab-center-form" style="display:none">
                             <div class="page-heading center-form-page-heading">
                                 <div>
-                                    <h1 class="page-title" id="center-form-page-title">Off Take Form</h1>
-                                    <p class="page-subtitle">Search outlet records, review form totals, and send requests to approval.</p>
+                                    <h1 class="page-title"
+                                        id="center-form-page-title">Off Take
+                                        Form</h1>
+                                    <p class="page-subtitle">Search outlet
+                                        records, review form totals, and send
+                                        requests to approval.</p>
                                 </div>
-                                <div class="toolbar-actions center-form-page-actions">
-                                    <button class="btn-secondary" type="button" onclick="refreshCenterFormPreviewData()">Refresh Data</button>
-                                    <button class="btn-primary" id="btn-cf-print" type="button" onclick="printCenterForm()" style="display:none;">Print Preview</button>
+                                <div
+                                    class="toolbar-actions center-form-page-actions">
+                                    <button class="btn-secondary" type="button"
+                                        onclick="refreshCenterFormPreviewData()">Refresh
+                                        Data</button>
+                                    <button class="btn-primary"
+                                        id="btn-cf-print" type="button"
+                                        onclick="printCenterForm()"
+                                        style="display:none;">Print
+                                        Preview</button>
                                 </div>
                             </div>
 
-                            <div class="center-form-preview-shell center-form-preview-shell--single">
+                            <div
+                                class="center-form-preview-shell center-form-preview-shell--single">
                                 <section class="center-form-preview-workspace">
-                                    <div class="center-form-section-tabs" role="tablist" aria-label="Center Form sections">
-                                        <button class="center-form-section-tab active" type="button" data-section="off-take" onclick="setVisitationCenterFormSection('off-take')">Off Take</button>
-                                        <button class="center-form-section-tab" type="button" data-section="claim-form" onclick="setVisitationCenterFormSection('claim-form')">Claim Form</button>
-                                        <button class="center-form-section-tab" type="button" data-section="mkt-yearly-form" onclick="setVisitationCenterFormSection('mkt-yearly-form')">MKT&amp;Yearly Form</button>
-                                        <button class="center-form-section-tab" type="button" data-section="presentation" onclick="setVisitationCenterFormSection('presentation')">Presentation</button>
+                                    <div class="center-form-section-tabs"
+                                        role="tablist"
+                                        aria-label="Center Form sections">
+                                        <button
+                                            class="center-form-section-tab active"
+                                            type="button"
+                                            data-section="off-take"
+                                            onclick="setVisitationCenterFormSection('off-take')">Off
+                                            Take</button>
+                                        <button class="center-form-section-tab"
+                                            type="button"
+                                            data-section="claim-form"
+                                            onclick="setVisitationCenterFormSection('claim-form')">Claim
+                                            Form</button>
+                                        <button class="center-form-section-tab"
+                                            type="button"
+                                            data-section="mkt-yearly-form"
+                                            onclick="setVisitationCenterFormSection('mkt-yearly-form')">MKT&amp;Yearly
+                                            Form</button>
+                                        <button class="center-form-section-tab"
+                                            type="button"
+                                            data-section="presentation"
+                                            onclick="setVisitationCenterFormSection('presentation')">Presentation</button>
                                     </div>
                                     <div class="center-form-preview-controls">
                                         <div class="form-group">
-                                            <label class="form-label">Outlet Name</label>
-                                            <select id="cf-outlet-select" class="form-select" onchange="loadCFPreview()">
-                                                <option value="">Loading outlet name...</option>
+                                            <label class="form-label">Outlet
+                                                Name</label>
+                                            <select id="cf-outlet-select"
+                                                class="form-select"
+                                                onchange="loadCFPreview()">
+                                                <option value>Loading outlet
+                                                    name...</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label class="form-label">Year</label>
-                                            <select id="cf-period-year-select" class="form-select" onchange="setCenterFormPeriodYear(this.value)">
-                                                <option value="">All Years</option>
+                                            <label
+                                                class="form-label">Year</label>
+                                            <select id="cf-period-year-select"
+                                                class="form-select"
+                                                onchange="setCenterFormPeriodYear(this.value)">
+                                                <option value>All Years</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label class="form-label">Month</label>
-                                            <select id="cf-period-month-select" class="form-select" onchange="setCenterFormPeriodMonth(this.value)" disabled>
-                                                <option value="">Select year first</option>
+                                            <label
+                                                class="form-label">Month</label>
+                                            <select id="cf-period-month-select"
+                                                class="form-select"
+                                                onchange="setCenterFormPeriodMonth(this.value)"
+                                                disabled>
+                                                <option value>Select year
+                                                    first</option>
                                             </select>
                                         </div>
                                     </div>
 
-                                    <div id="cf-preview-area" class="center-form-sheet-stage">
-                                        <div class="wine-loading-placeholder center-form-card-loading">Loading form preview...</div>
+                                    <div id="cf-preview-area"
+                                        class="center-form-sheet-stage">
+                                        <div
+                                            class="wine-loading-placeholder center-form-card-loading">Loading
+                                            form preview...</div>
                                     </div>
                                 </section>
                             </div>
@@ -2607,7 +3028,8 @@
                 src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
             <script
                 src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-            <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+            <script
+                src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
             <script src="app.js"></script>
 
             <template id="visit-card-template">
