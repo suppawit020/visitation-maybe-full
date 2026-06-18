@@ -170,7 +170,7 @@ let AppState = {
     currentFacingMode: 'environment',
     visits: [],
     photos: [],
-    userProfile: { empId: '', name: '', email: '', team: '', area: '', contact: '', avatar: '' },
+    userProfile: { empId: '', name: '', email: '', team: '', position: '', level: '', area: '', contact: '', avatar: '' },
     currentPage: 0,
     pendingSaveData: null,
     deleteTargetId: null,
@@ -188,6 +188,25 @@ let AppState = {
     calendarObj: null,
     localAppointments: [],
     notifications: [] // เก็บ notification list
+};
+
+const UserOffTakeState = {
+    outlets: [],
+    products: [],
+    wholesalers: [],
+    rows: [],
+    mastersLoaded: false,
+    dataLoaded: false
+};
+
+const UserCenterFormState = {
+    customers: [],
+    rows: [],
+    selectedYear: '',
+    selectedMonth: '',
+    initialized: false,
+    section: 'off-take',
+    presentationFolder: ''
 };
 
 // ============================================================
@@ -226,6 +245,8 @@ async function checkSession() {
             name: localProfile.name || '',
             email: localProfile.email || '',
             team: localProfile.team || '',
+            position: localProfile.position || '',
+            level: localProfile.level || localProfile.area || '',
             subTeam: localProfile.subTeam || '',
             area: localProfile.area || '',
             contact: localProfile.contact || '-',
@@ -488,6 +509,8 @@ window.doUserLogin = async function () {
             name: info.name,
             email: info.email,
             team: info.team,
+            position: info.position || '',
+            level: info.level || '',
             subTeam: info.sub_team,
             area: info.level,
             contact: info.contact || '-',
@@ -530,7 +553,7 @@ window.doUserLogout = function () {
     }
 
     AppState.loggedInUser = null;
-    AppState.userProfile = { empId: '', name: '', email: '', team: '', area: '', contact: '', avatar: '' };
+    AppState.userProfile = { empId: '', name: '', email: '', team: '', position: '', level: '', area: '', contact: '', avatar: '' };
     AppState.visits = [];
     AppState.photos = [];
 
@@ -1264,7 +1287,7 @@ function showMainApp() {
 window.switchTab = function (tab) {
     if (tab !== 'new') window.stopCamera();
 
-    const tabs = ['new', 'list', 'calendar'];
+    const tabs = ['new', 'list', 'calendar', 'outlet-master', 'offtake', 'center-form'];
     document.querySelectorAll('.sidebar-nav .tab').forEach((t, i) => {
         t.classList.toggle('active', tabs[i] === tab);
     });
@@ -1289,7 +1312,10 @@ window.switchTab = function (tab) {
         const titles = {
             new: { en: 'New Visit', th: 'บันทึกการเยี่ยม' },
             list: { en: 'All Visits', th: 'ประวัติทั้งหมด' },
-            calendar: { en: 'Calendar Schedule', th: 'ปฏิทินนัดหมาย' }
+            calendar: { en: 'Calendar Schedule', th: 'ปฏิทินนัดหมาย' },
+            'outlet-master': { en: 'Outlet Master', th: 'Outlet Master' },
+            offtake: { en: 'Off Take', th: 'Off Take' },
+            'center-form': { en: 'Off Take Form', th: 'Off Take Form' }
         };
         if (titles[tab]) pageTitle.textContent = titles[tab][lang] || titles[tab].en;
     }
@@ -1301,6 +1327,9 @@ window.switchTab = function (tab) {
     }
 
     if (tab === 'list') { AppState.currentPage = 0; fetchVisitsWithSkeleton(); }
+    if (tab === 'outlet-master') loadVisitationOutletMaster();
+    if (tab === 'offtake') loadVisitationOffTake();
+    if (tab === 'center-form') initCenterFormOffTake();
 
     if (tab === 'calendar') {
         setTimeout(() => {
@@ -3126,3 +3155,883 @@ function _applyLang(lang) {
         }
     } catch (e) { }
 })();
+
+// ============================================================
+// USER OFF TAKE + DATA CENTER
+// Uses the same off_take table as OneAlchemy Admin, scoped to the
+// outlets assigned to the signed-in visitation user.
+// ============================================================
+function userOffTakeText(value) {
+    return String(value ?? '').trim();
+}
+
+function userOffTakeNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+function userOffTakeMoney(value) {
+    return userOffTakeNumber(value).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function userOffTakeEscape(value) {
+    return userOffTakeText(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function getUserOffTakeMonthValue() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatUserOffTakeMonth(value) {
+    const match = userOffTakeText(value).match(/^(\d{4})-(\d{2})$/);
+    if (!match) return userOffTakeText(value) || null;
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${names[Number(match[2]) - 1]}-${match[1].slice(-2)}`;
+}
+
+function getUserOffTakeMonthKey(value) {
+    const text = userOffTakeText(value);
+    if (/^\d{4}-\d{2}$/.test(text)) return text;
+    const match = text.match(/^([A-Za-z]{3})[-\s](\d{2,4})$/);
+    if (!match) return '';
+    const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(match[1].toLowerCase()) + 1;
+    if (!month) return '';
+    const year = match[2].length === 2 ? `20${match[2]}` : match[2];
+    return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function getUserWholesalerName(row) {
+    return userOffTakeText(row?.wholesaler_alias || row?.wholesaler_name_en || row?.wholesaler_name_th || row?.wholesaler_code);
+}
+
+function getUserProductCode(row) {
+    return userOffTakeText(row?.product_id || row?.sku || row?.bbc_code);
+}
+
+function parseUserProductSizeLiters(size) {
+    const match = userOffTakeText(size).toUpperCase().match(/(\d+(?:\.\d+)?)\s*(ML|CL|L|LTR|LITER|LITRE)\b/);
+    if (!match) return 0;
+    const amount = Number(match[1]);
+    if (match[2] === 'ML') return amount / 1000;
+    if (match[2] === 'CL') return amount / 100;
+    return amount;
+}
+
+function setUserOffTakeStatus(message, ok = true) {
+    const element = document.getElementById('ot-form-status');
+    if (!element) return;
+    element.textContent = message || '';
+    element.style.display = message ? 'block' : 'none';
+    element.style.color = ok ? '#166534' : '#991b1b';
+    element.style.background = ok ? '#dcfce7' : '#fee2e2';
+    element.style.border = `1px solid ${ok ? '#bbf7d0' : '#fecaca'}`;
+}
+
+async function loadUserOffTakeMasters(force = false) {
+    if (UserOffTakeState.mastersLoaded && !force) return;
+    const outletSelect = document.getElementById('ot-outlet');
+    const productSelect = document.getElementById('ot-product');
+    const wholesalerSelect = document.getElementById('ot-wholesaler');
+    if (!outletSelect || !productSelect || !wholesalerSelect) return;
+
+    outletSelect.innerHTML = '<option value="">Loading outlets...</option>';
+    productSelect.innerHTML = '<option value="">Loading products...</option>';
+    wholesalerSelect.innerHTML = '<option value="">Loading wholesalers...</option>';
+
+    try {
+        const empId = userOffTakeText(AppState.userProfile.empId);
+        const isAdmin = userOffTakeText(AppState.userProfile.team).toLowerCase() === 'admin';
+        let outletParams = 'select=customer_id,outlet_code,outlet_name,group_code,group_name,team,bde,area_by_bde,province,region,is_active&is_active=eq.true&order=outlet_name.asc&limit=2000';
+        if (!isAdmin && empId) outletParams += `&bde=eq.${encodeURIComponent(empId)}`;
+        if (!isAdmin && !empId) outletParams += '&customer_id=eq.__no_user__';
+
+        const [outlets, products, wholesalers] = await Promise.all([
+            DB.select('customers', outletParams),
+            DB.select('products', 'select=product_id,product_name,company_name,bbc_code,brand_owner_principle,brand,name_for_express,category,size,pack,sku,discontinue&order=product_name.asc&limit=2000'),
+            DB.select('wholesalers', 'select=wholesaler_code,wholesaler_name_th,wholesaler_name_en,wholesaler_alias&order=wholesaler_name_en.asc&limit=2000')
+        ]);
+
+        UserOffTakeState.outlets = (outlets || []).filter(row => row.is_active !== false);
+        UserOffTakeState.products = (products || []).filter(row => !row.discontinue || String(row.discontinue).toLowerCase() === 'false');
+        UserOffTakeState.wholesalers = wholesalers || [];
+        UserOffTakeState.mastersLoaded = true;
+
+        outletSelect.innerHTML = '<option value="">-- Select outlet --</option>' + UserOffTakeState.outlets.map(row =>
+            `<option value="${userOffTakeEscape(row.customer_id)}">${userOffTakeEscape(row.outlet_code || row.customer_id)} - ${userOffTakeEscape(row.outlet_name || 'Unnamed outlet')}</option>`
+        ).join('');
+        productSelect.innerHTML = '<option value="">-- Select product --</option>' + UserOffTakeState.products.map(row => {
+            const code = getUserProductCode(row);
+            const name = row.product_name || row.name_for_express || code;
+            return `<option value="${userOffTakeEscape(code)}">${userOffTakeEscape(code)} - ${userOffTakeEscape(name)}</option>`;
+        }).join('');
+        wholesalerSelect.innerHTML = '<option value="">-- Select wholesaler --</option>' + UserOffTakeState.wholesalers.map(row => {
+            const name = getUserWholesalerName(row);
+            return `<option value="${userOffTakeEscape(name)}">${userOffTakeEscape(name)}</option>`;
+        }).join('');
+
+        const month = document.getElementById('ot-month');
+        if (month && !month.value) month.value = getUserOffTakeMonthValue();
+        if (!UserOffTakeState.outlets.length) setUserOffTakeStatus('No outlet is assigned to this user. Please contact OneAlchemy Admin.', false);
+    } catch (error) {
+        console.error('Failed to load Off Take masters:', error);
+        setUserOffTakeStatus(`Unable to load form data: ${error.message}`, false);
+    }
+}
+
+window.handleUserOffTakeOutletChange = function () {
+    setUserOffTakeStatus('');
+};
+
+window.handleUserOffTakeProductChange = function () {
+    setUserOffTakeStatus('');
+};
+
+window.calculateUserOffTake = function (source = '') {
+    const incInput = document.getElementById('ot-price-inc');
+    const excInput = document.getElementById('ot-price-exc');
+    if (!incInput || !excInput) return;
+    let inc = userOffTakeNumber(incInput.value);
+    let exc = userOffTakeNumber(excInput.value);
+    if (source === 'inc' && inc > 0) {
+        exc = Math.round((inc / 1.07) * 100) / 100;
+        excInput.value = exc.toFixed(2);
+    } else if (source === 'exc' && exc > 0 && !inc) {
+        inc = Math.round((exc * 1.07) * 100) / 100;
+        incInput.value = inc.toFixed(2);
+    }
+    const volume = userOffTakeNumber(document.getElementById('ot-volume')?.value);
+    const rebate = userOffTakeNumber(document.getElementById('ot-rebate')?.value);
+    document.getElementById('ot-total-inc').textContent = userOffTakeMoney(inc * volume);
+    document.getElementById('ot-total-exc').textContent = userOffTakeMoney(exc * volume);
+    document.getElementById('ot-total-rebate').textContent = userOffTakeMoney(exc * volume * rebate / 100);
+};
+
+window.resetUserOffTakeForm = function () {
+    document.getElementById('user-offtake-form')?.reset();
+    const month = document.getElementById('ot-month');
+    if (month) month.value = getUserOffTakeMonthValue();
+    const rebate = document.getElementById('ot-rebate');
+    if (rebate) rebate.value = '25';
+    calculateUserOffTake();
+    setUserOffTakeStatus('');
+};
+
+window.saveUserOffTake = async function (event) {
+    event?.preventDefault();
+    const form = document.getElementById('user-offtake-form');
+    if (!form?.reportValidity()) return;
+
+    const customer = UserOffTakeState.outlets.find(row => String(row.customer_id) === document.getElementById('ot-outlet')?.value);
+    const productCode = document.getElementById('ot-product')?.value;
+    const product = UserOffTakeState.products.find(row => getUserProductCode(row) === productCode);
+    if (!customer || !product) {
+        setUserOffTakeStatus('Please select a valid outlet and product.', false);
+        return;
+    }
+
+    const priceInc = userOffTakeNumber(document.getElementById('ot-price-inc')?.value);
+    const priceExc = userOffTakeNumber(document.getElementById('ot-price-exc')?.value);
+    const volume = userOffTakeNumber(document.getElementById('ot-volume')?.value);
+    const rebatePercent = userOffTakeNumber(document.getElementById('ot-rebate')?.value);
+    const totalInc = Math.round(priceInc * volume * 100) / 100;
+    const totalExc = Math.round(priceExc * volume * 100) / 100;
+    const rebateAmount = Math.round(totalExc * rebatePercent) / 100;
+    const userName = AppState.userProfile.name || AppState.userProfile.empId || '';
+    const button = document.getElementById('ot-save-btn');
+
+    const payload = {
+        outlet_code: customer.outlet_code || customer.customer_id,
+        outlet_name: customer.outlet_name || null,
+        outlet_group: customer.group_name || customer.group_code || null,
+        current_team: customer.team || AppState.userProfile.team || null,
+        current_bde: customer.bde || AppState.userProfile.empId || null,
+        bde: userName || null,
+        area: customer.area_by_bde || customer.province || customer.region || AppState.userProfile.area || null,
+        wholesaler: document.getElementById('ot-wholesaler')?.value || null,
+        sku_company: product.company_name || null,
+        sku_code: productCode,
+        principle: product.brand_owner_principle || null,
+        category: product.category || null,
+        brand: product.brand || null,
+        product: product.product_name || product.name_for_express || productCode,
+        size: product.size || null,
+        packing: product.pack || null,
+        price_inc_vat: priceInc,
+        price_exc_vat: priceExc,
+        vol_btls: volume,
+        rebate_percent: rebatePercent,
+        total_price_inc_vat: totalInc,
+        total_price_exc_vat: totalExc,
+        direct_price_exc_vat: priceExc,
+        total_direct_price_exc_vat: totalExc,
+        rebate_amount: rebateAmount,
+        received_month: formatUserOffTakeMonth(document.getElementById('ot-month')?.value),
+        liter: Math.round(parseUserProductSizeLiters(product.size) * volume * 1000) / 1000,
+        source_file: 'web:visitation-off-take',
+        source_row: null,
+        updated_at: new Date().toISOString()
+    };
+
+    try {
+        if (button) { button.disabled = true; button.textContent = 'Saving...'; }
+        setUserOffTakeStatus('Saving to OneAlchemy...', true);
+        await DB.insert('off_take', payload);
+        UserOffTakeState.dataLoaded = false;
+        const selectedOutlet = document.getElementById('ot-outlet')?.value;
+        resetUserOffTakeForm();
+        if (document.getElementById('ot-outlet')) document.getElementById('ot-outlet').value = selectedOutlet || '';
+        setUserOffTakeStatus('Off Take saved. OneAlchemy Admin can now see this record.', true);
+        toast('Off Take saved successfully!');
+    } catch (error) {
+        console.error('Failed to save user Off Take:', error);
+        setUserOffTakeStatus(`Save failed: ${error.message}`, false);
+        toast('Failed to save Off Take: ' + error.message, false);
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Save Off Take'; }
+    }
+};
+
+async function fetchUserOffTakeRows() {
+    await loadUserOffTakeMasters();
+    const outletCodes = Array.from(new Set(UserOffTakeState.outlets.map(row => userOffTakeText(row.outlet_code || row.customer_id)).filter(Boolean)));
+    if (!outletCodes.length) return [];
+    const rows = [];
+    for (let start = 0; start < outletCodes.length; start += 40) {
+        const quoted = outletCodes.slice(start, start + 40).map(value => `"${value.replace(/"/g, '\\"')}"`).join(',');
+        const params = `select=id,outlet_code,outlet_name,wholesaler,sku_code,product,brand,vol_btls,total_price_exc_vat,rebate_amount,received_month,created_at,updated_at&outlet_code=in.${encodeURIComponent(`(${quoted})`)}&order=created_at.desc&limit=2000`;
+        const batch = await DB.select('off_take', params);
+        rows.push(...(batch || []));
+    }
+    return rows;
+}
+
+window.loadUserDataCenter = async function (force = false) {
+    const body = document.getElementById('dc-table-body');
+    if (!body) return;
+    if (UserOffTakeState.dataLoaded && !force) {
+        renderUserDataCenter();
+        return;
+    }
+    body.innerHTML = '<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--text-muted);">Loading your Off Take records...</td></tr>';
+    try {
+        UserOffTakeState.rows = await fetchUserOffTakeRows();
+        UserOffTakeState.dataLoaded = true;
+        renderUserDataCenter();
+    } catch (error) {
+        console.error('Failed to load Data Center:', error);
+        body.innerHTML = `<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--danger);">${userOffTakeEscape(error.message)}</td></tr>`;
+    }
+};
+
+window.renderUserDataCenter = function () {
+    const body = document.getElementById('dc-table-body');
+    if (!body) return;
+    const search = userOffTakeText(document.getElementById('dc-search')?.value).toLowerCase();
+    const month = userOffTakeText(document.getElementById('dc-month')?.value);
+    const rows = UserOffTakeState.rows.filter(row => {
+        if (month && getUserOffTakeMonthKey(row.received_month) !== month) return false;
+        if (!search) return true;
+        return [row.outlet_code, row.outlet_name, row.wholesaler, row.sku_code, row.product, row.brand]
+            .some(value => userOffTakeText(value).toLowerCase().includes(search));
+    });
+
+    const volume = rows.reduce((sum, row) => sum + userOffTakeNumber(row.vol_btls), 0);
+    const value = rows.reduce((sum, row) => sum + userOffTakeNumber(row.total_price_exc_vat), 0);
+    document.getElementById('dc-record-count').textContent = rows.length.toLocaleString('en-US');
+    document.getElementById('dc-volume-total').textContent = volume.toLocaleString('en-US');
+    document.getElementById('dc-value-total').textContent = userOffTakeMoney(value);
+
+    if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--text-muted);">No Off Take records found for your outlets.</td></tr>';
+    } else {
+        body.innerHTML = rows.map(row => `<tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:10px 8px;white-space:nowrap;">${userOffTakeEscape(row.received_month || '-')}</td>
+            <td style="padding:10px 8px;"><strong>${userOffTakeEscape(row.outlet_name || '-')}</strong><div style="color:var(--text-muted);">${userOffTakeEscape(row.outlet_code || '')}</div></td>
+            <td style="padding:10px 8px;">${userOffTakeEscape(row.wholesaler || '-')}</td>
+            <td style="padding:10px 8px;"><strong>${userOffTakeEscape(row.sku_code || '-')}</strong><div style="color:var(--text-muted);">${userOffTakeEscape(row.product || row.brand || '')}</div></td>
+            <td style="padding:10px 8px;text-align:right;">${userOffTakeNumber(row.vol_btls).toLocaleString('en-US')}</td>
+            <td style="padding:10px 8px;text-align:right;">${userOffTakeMoney(row.total_price_exc_vat)}</td>
+            <td style="padding:10px 8px;text-align:right;">${userOffTakeMoney(row.rebate_amount)}</td>
+        </tr>`).join('');
+    }
+    const info = document.getElementById('dc-table-info');
+    if (info) info.textContent = `Showing ${rows.length.toLocaleString('en-US')} of ${UserOffTakeState.rows.length.toLocaleString('en-US')} records for your assigned outlets.`;
+};
+
+// ============================================================
+// ONEALCHEMY USER SURFACES
+// Admin accounts (Team = Admin in user.xlsx) see every row.
+// Other accounts are scoped by user_id -> customers.bde -> outlet_code.
+// ============================================================
+const VisitationOneAlchemyState = {
+    customers: [],
+    offTakeRows: [],
+    outletsLoaded: false,
+    offTakeLoaded: false,
+    centerRows: [],
+    centerCustomerId: ''
+};
+
+const VISITATION_CUSTOMER_SELECT = [
+    'customer_id', 'outlet_code', 'outlet_name', 'company_name', 'company_name_th',
+    'group_code', 'group_name', 'team', 'bde', 'area_by_bde', 'province', 'region',
+    'is_active', 'alchemy_outlet_type', 'alchemy_sub_type', 'alchemy_segmentation',
+    'campari_seg_new', 'wholeseller_supply'
+].join(',');
+
+const VISITATION_OFF_TAKE_SELECT = [
+    'id', 'outlet_code', 'outlet_name', 'outlet_group', 'current_team', 'current_bde',
+    'bde', 'area', 'wholesaler', 'sku_company', 'sku_code', 'principle', 'category',
+    'brand', 'product', 'size', 'packing', 'price_inc_vat', 'price_exc_vat',
+    'vol_btls', 'rebate_percent', 'total_price_inc_vat', 'total_price_exc_vat',
+    'direct_price_exc_vat', 'total_direct_price_exc_vat', 'rebate_amount',
+    'received_month', 'liter', 'created_at', 'updated_at'
+].join(',');
+
+function isVisitationAdmin() {
+    const team = userOffTakeText(AppState.userProfile.team).toLowerCase();
+    const position = userOffTakeText(AppState.userProfile.position).toLowerCase();
+    return team === 'admin' || position === 'admin';
+}
+
+async function fetchVisitationPaged(table, baseParams, pageSize = 1000) {
+    const rows = [];
+    for (let offset = 0; ; offset += pageSize) {
+        const batch = await DB.select(table, `${baseParams}&limit=${pageSize}&offset=${offset}`);
+        rows.push(...(batch || []));
+        if (!batch || batch.length < pageSize) break;
+    }
+    return rows;
+}
+
+async function getVisitationScopedCustomers(force = false) {
+    if (VisitationOneAlchemyState.outletsLoaded && !force) return VisitationOneAlchemyState.customers;
+    const empId = userOffTakeText(AppState.userProfile.empId);
+    let params = `select=${VISITATION_CUSTOMER_SELECT}&order=outlet_name.asc`;
+    if (!isVisitationAdmin()) {
+        params += empId ? `&bde=eq.${encodeURIComponent(empId)}` : '&customer_id=eq.__no_user__';
+    }
+    VisitationOneAlchemyState.customers = await fetchVisitationPaged('customers', params);
+    VisitationOneAlchemyState.outletsLoaded = true;
+    return VisitationOneAlchemyState.customers;
+}
+
+async function fetchOffTakeForOutletCodes(outletCodes) {
+    const codes = Array.from(new Set((outletCodes || []).map(userOffTakeText).filter(Boolean)));
+    if (!codes.length) return [];
+    const rows = [];
+    for (let start = 0; start < codes.length; start += 35) {
+        const quoted = codes.slice(start, start + 35).map(value => `"${value.replace(/"/g, '\\"')}"`).join(',');
+        const filter = `outlet_code=in.${encodeURIComponent(`(${quoted})`)}`;
+        rows.push(...await fetchVisitationPaged('off_take', `select=${VISITATION_OFF_TAKE_SELECT}&${filter}&order=created_at.desc`));
+    }
+    return rows;
+}
+
+async function getVisitationScopedOffTake(force = false) {
+    if (VisitationOneAlchemyState.offTakeLoaded && !force) return VisitationOneAlchemyState.offTakeRows;
+    if (isVisitationAdmin()) {
+        VisitationOneAlchemyState.offTakeRows = await fetchVisitationPaged(
+            'off_take', `select=${VISITATION_OFF_TAKE_SELECT}&order=created_at.desc`
+        );
+    } else {
+        const customers = await getVisitationScopedCustomers(force);
+        const outletCodes = customers.map(row => row.outlet_code || row.customer_id);
+        VisitationOneAlchemyState.offTakeRows = await fetchOffTakeForOutletCodes(outletCodes);
+    }
+    VisitationOneAlchemyState.offTakeLoaded = true;
+    return VisitationOneAlchemyState.offTakeRows;
+}
+
+window.loadVisitationOutletMaster = async function (force = false) {
+    const body = document.getElementById('vom-tbody');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="13" class="table-empty-cell">Loading outlet data...</td></tr>';
+    try {
+        await getVisitationScopedCustomers(force);
+        renderVisitationOutletMaster();
+    } catch (error) {
+        console.error('Outlet Master load failed:', error);
+        body.innerHTML = `<tr><td colspan="13" class="table-empty-cell">${userOffTakeEscape(error.message)}</td></tr>`;
+    }
+};
+
+window.renderVisitationOutletMaster = function () {
+    const body = document.getElementById('vom-tbody');
+    if (!body) return;
+    const search = userOffTakeText(document.getElementById('vom-search')?.value).toLowerCase();
+    const status = userOffTakeText(document.getElementById('vom-status')?.value);
+    const rows = VisitationOneAlchemyState.customers.filter(row => {
+        if (status === 'active' && row.is_active === false) return false;
+        if (status === 'inactive' && row.is_active !== false) return false;
+        if (!search) return true;
+        return [row.customer_id, row.outlet_code, row.outlet_name, row.company_name, row.group_name,
+            row.team, row.bde, row.area_by_bde, row.province, row.region]
+            .some(value => userOffTakeText(value).toLowerCase().includes(search));
+    });
+    body.innerHTML = rows.length ? rows.map(row => `<tr>
+        <td>${userOffTakeEscape(row.customer_id)}</td><td>${userOffTakeEscape(row.outlet_code)}</td>
+        <td><strong>${userOffTakeEscape(row.outlet_name || '-')}</strong></td><td>${userOffTakeEscape(row.company_name || row.company_name_th || '-')}</td>
+        <td>${userOffTakeEscape(row.group_name || row.group_code || '-')}</td><td>${userOffTakeEscape(row.team || '-')}</td>
+        <td>${userOffTakeEscape(row.bde || '-')}</td><td>${userOffTakeEscape(row.area_by_bde || '-')}</td>
+        <td>${userOffTakeEscape(row.province || '-')}</td><td>${userOffTakeEscape(row.region || '-')}</td>
+        <td>${userOffTakeEscape(row.alchemy_outlet_type || row.alchemy_sub_type || '-')}</td>
+        <td>${userOffTakeEscape(row.alchemy_segmentation || row.campari_seg_new || '-')}</td>
+        <td>${row.is_active === false ? 'Inactive' : 'Active'}</td>
+    </tr>`).join('') : '<tr><td colspan="13" class="table-empty-cell">No outlet records found.</td></tr>';
+    const info = document.getElementById('vom-info');
+    if (info) info.textContent = `Showing ${rows.length.toLocaleString('en-US')} of ${VisitationOneAlchemyState.customers.length.toLocaleString('en-US')} outlets${isVisitationAdmin() ? ' (Admin: all data)' : ' (your data only)'}`;
+};
+
+function setVisitationFilterOptions(id, values, allLabel) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const current = select.value;
+    const options = Array.from(new Set(values.map(userOffTakeText).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    select.innerHTML = `<option value="">${allLabel}</option>` + options.map(value => `<option value="${userOffTakeEscape(value)}">${userOffTakeEscape(value)}</option>`).join('');
+    if (options.includes(current)) select.value = current;
+}
+
+window.loadVisitationOffTake = async function (force = false) {
+    const body = document.getElementById('vot-tbody');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="25" class="table-empty-cell">Loading off-take data...</td></tr>';
+    try {
+        const rows = await getVisitationScopedOffTake(force);
+        setVisitationFilterOptions('vot-year', rows.map(row => getUserOffTakeMonthKey(row.received_month).slice(0, 4)), 'All Years');
+        setVisitationFilterOptions('vot-month', rows.map(row => row.received_month), 'All Months');
+        setVisitationFilterOptions('vot-wholesaler', rows.map(row => row.wholesaler), 'All Wholesalers');
+        setVisitationFilterOptions('vot-principle', rows.map(row => row.principle), 'All Principles');
+        setVisitationFilterOptions('vot-category', rows.map(row => row.category), 'All Categories');
+        renderVisitationOffTake();
+    } catch (error) {
+        console.error('Off Take load failed:', error);
+        body.innerHTML = `<tr><td colspan="25" class="table-empty-cell">${userOffTakeEscape(error.message)}</td></tr>`;
+    }
+};
+
+window.renderVisitationOffTake = function () {
+    const body = document.getElementById('vot-tbody');
+    if (!body) return;
+    const search = userOffTakeText(document.getElementById('vot-search')?.value).toLowerCase();
+    const year = userOffTakeText(document.getElementById('vot-year')?.value);
+    const month = userOffTakeText(document.getElementById('vot-month')?.value);
+    const wholesaler = userOffTakeText(document.getElementById('vot-wholesaler')?.value);
+    const principle = userOffTakeText(document.getElementById('vot-principle')?.value);
+    const category = userOffTakeText(document.getElementById('vot-category')?.value);
+    const rows = VisitationOneAlchemyState.offTakeRows.filter(row => {
+        if (year && !getUserOffTakeMonthKey(row.received_month).startsWith(year)) return false;
+        if (month && row.received_month !== month) return false;
+        if (wholesaler && row.wholesaler !== wholesaler) return false;
+        if (principle && row.principle !== principle) return false;
+        if (category && row.category !== category) return false;
+        if (!search) return true;
+        return [row.outlet_code, row.outlet_name, row.wholesaler, row.sku_code, row.principle,
+            row.category, row.brand, row.product, row.bde, row.area]
+            .some(value => userOffTakeText(value).toLowerCase().includes(search));
+    });
+    const money = value => userOffTakeMoney(value);
+    body.innerHTML = rows.length ? rows.map(row => `<tr>
+        <td>${userOffTakeEscape(row.outlet_code)}</td><td><strong>${userOffTakeEscape(row.outlet_name || '-')}</strong></td>
+        <td>${userOffTakeEscape(row.outlet_group || '-')}</td><td>${userOffTakeEscape(row.current_team || '-')}</td>
+        <td>${userOffTakeEscape(row.current_bde || '-')}</td><td>${userOffTakeEscape(row.bde || '-')}</td>
+        <td>${userOffTakeEscape(row.area || '-')}</td><td>${userOffTakeEscape(row.wholesaler || '-')}</td>
+        <td>${userOffTakeEscape(row.sku_company || '-')}</td><td>${userOffTakeEscape(row.sku_code || '-')}</td>
+        <td>${userOffTakeEscape(row.principle || '-')}</td><td>${userOffTakeEscape(row.category || '-')}</td>
+        <td>${userOffTakeEscape(row.brand || '-')}</td><td>${userOffTakeEscape(row.product || '-')}</td>
+        <td>${userOffTakeEscape(row.size || '-')}</td><td>${userOffTakeEscape(row.packing || '-')}</td>
+        <td style="text-align:right">${money(row.price_inc_vat)}</td><td style="text-align:right">${money(row.price_exc_vat)}</td>
+        <td style="text-align:right">${userOffTakeNumber(row.vol_btls).toLocaleString('en-US')}</td><td style="text-align:right">${money(row.rebate_percent)}</td>
+        <td style="text-align:right">${money(row.total_price_inc_vat)}</td><td style="text-align:right">${money(row.total_price_exc_vat)}</td>
+        <td style="text-align:right">${money(row.rebate_amount)}</td><td>${userOffTakeEscape(row.received_month || '-')}</td>
+        <td style="text-align:right">${money(row.liter)}</td>
+    </tr>`).join('') : '<tr><td colspan="25" class="table-empty-cell">No off-take records found.</td></tr>';
+    const info = document.getElementById('vot-info');
+    if (info) info.textContent = `Showing ${rows.length.toLocaleString('en-US')} of ${VisitationOneAlchemyState.offTakeRows.length.toLocaleString('en-US')} off-take rows${isVisitationAdmin() ? ' (Admin: all data)' : ' (your data only)'}`;
+};
+
+window.initCenterFormOffTake = async function (force = false) {
+    const outletSelect = document.getElementById('cf-outlet-select');
+    if (!outletSelect) return;
+    if (UserCenterFormState.initialized && !force) return;
+    outletSelect.innerHTML = '<option value="">Loading outlet name...</option>';
+    try {
+        const customers = await getVisitationScopedCustomers(force);
+        UserCenterFormState.customers = customers;
+        outletSelect.innerHTML = '<option value="">Select outlet name...</option>' + customers.map(row =>
+            `<option value="${userOffTakeEscape(row.customer_id)}">${userOffTakeEscape(row.outlet_code || row.customer_id)} - ${userOffTakeEscape(row.outlet_name || 'Unspecified')}</option>`
+        ).join('');
+        UserCenterFormState.initialized = true;
+        renderCenterFormBlank();
+    } catch (error) {
+        document.getElementById('cf-preview-area').innerHTML = `<div class="cf-preview-error">${userOffTakeEscape(error.message)}</div>`;
+    }
+};
+
+function renderCenterFormBlank() {
+    const area = document.getElementById('cf-preview-area');
+    if (!area) return;
+    if (UserCenterFormState.section === 'claim-form') renderVisitationClaimForm(area, null, [], '');
+    else if (UserCenterFormState.section === 'mkt-yearly-form') renderVisitationMktYearly();
+    else if (UserCenterFormState.section === 'presentation') renderVisitationPresentationLibrary();
+    else renderVisitationCenterForm(area, null, [], {}, '', true);
+    const print = document.getElementById('btn-cf-print');
+    if (print) print.style.display = 'none';
+}
+
+function populateCenterFormPeriods(rows, preserve = true) {
+    const yearSelect = document.getElementById('cf-period-year-select');
+    const monthSelect = document.getElementById('cf-period-month-select');
+    if (!yearSelect || !monthSelect) return;
+    const keys = rows.map(row => getUserOffTakeMonthKey(row.received_month)).filter(Boolean).sort().reverse();
+    const years = Array.from(new Set(keys.map(key => key.slice(0, 4))));
+    if (!preserve || !years.includes(UserCenterFormState.selectedYear)) UserCenterFormState.selectedYear = years[0] || '';
+    yearSelect.innerHTML = '<option value="">All Years</option>' + years.map(year => `<option value="${year}">${year}</option>`).join('');
+    yearSelect.value = UserCenterFormState.selectedYear;
+    const months = Array.from(new Set(keys.filter(key => !UserCenterFormState.selectedYear || key.startsWith(UserCenterFormState.selectedYear)).map(key => key.slice(5, 7))));
+    if (!preserve || !months.includes(UserCenterFormState.selectedMonth)) UserCenterFormState.selectedMonth = months[0] || '';
+    monthSelect.disabled = !UserCenterFormState.selectedYear;
+    monthSelect.innerHTML = '<option value="">All Months</option>' + months.map(month => `<option value="${month}">${new Date(2000, Number(month) - 1, 1).toLocaleString('en', { month: 'long' })}</option>`).join('');
+    monthSelect.value = UserCenterFormState.selectedMonth;
+}
+
+window.setVisitationCenterFormSection = function (section) {
+    const allowed = ['off-take', 'claim-form', 'mkt-yearly-form', 'presentation'];
+    UserCenterFormState.section = allowed.includes(section) ? section : 'off-take';
+    document.querySelectorAll('.center-form-section-tab').forEach(button => {
+        button.classList.toggle('active', button.dataset.section === UserCenterFormState.section);
+    });
+    const titleMap = {
+        'off-take': 'Off Take Form',
+        'claim-form': 'Claim Form',
+        'mkt-yearly-form': 'MKT&Yearly Form',
+        presentation: 'Presentation'
+    };
+    const title = document.getElementById('center-form-page-title');
+    if (title) title.textContent = titleMap[UserCenterFormState.section];
+    const controls = document.querySelector('#tab-center-form .center-form-preview-controls');
+    if (controls) controls.style.display = UserCenterFormState.section === 'presentation' ? 'none' : 'grid';
+    const print = document.getElementById('btn-cf-print');
+    if (print && UserCenterFormState.section !== 'off-take') print.style.display = 'none';
+    if (UserCenterFormState.section === 'presentation') renderVisitationPresentationLibrary();
+    else if (UserCenterFormState.section === 'mkt-yearly-form') renderVisitationMktYearly();
+    else if (UserCenterFormState.centerCustomerId) renderCurrentCenterForm();
+    else renderCenterFormBlank();
+};
+
+window.setCenterFormPeriodYear = function (value) {
+    UserCenterFormState.selectedYear = value || '';
+    UserCenterFormState.selectedMonth = '';
+    populateCenterFormPeriods(UserCenterFormState.rows, false);
+    renderCurrentCenterForm();
+};
+
+window.setCenterFormPeriodMonth = function (value) {
+    UserCenterFormState.selectedMonth = value || '';
+    renderCurrentCenterForm();
+};
+
+window.loadCFPreview = async function () {
+    if (UserCenterFormState.section === 'presentation') return renderVisitationPresentationLibrary();
+    if (UserCenterFormState.section === 'mkt-yearly-form') return renderVisitationMktYearly();
+    const customerId = document.getElementById('cf-outlet-select')?.value || '';
+    UserCenterFormState.centerCustomerId = customerId;
+    if (!customerId) {
+        UserCenterFormState.rows = [];
+        renderCenterFormBlank();
+        return;
+    }
+    const customer = UserCenterFormState.customers.find(row => String(row.customer_id) === String(customerId));
+    if (!customer) return renderCenterFormBlank();
+    const area = document.getElementById('cf-preview-area');
+    area.innerHTML = '<div class="center-form-card-loading">Loading form preview...</div>';
+    try {
+        UserCenterFormState.rows = await fetchOffTakeForOutletCodes([customer.outlet_code || customer.customer_id]);
+        UserCenterFormState.selectedYear = '';
+        UserCenterFormState.selectedMonth = '';
+        populateCenterFormPeriods(UserCenterFormState.rows, false);
+        await renderCurrentCenterForm();
+    } catch (error) {
+        area.innerHTML = `<div class="cf-preview-error">${userOffTakeEscape(error.message)}</div>`;
+    }
+};
+
+async function renderCurrentCenterForm() {
+    const customerId = UserCenterFormState.centerCustomerId;
+    const customer = UserCenterFormState.customers.find(row => String(row.customer_id) === String(customerId));
+    if (!customer) return renderCenterFormBlank();
+    const rows = UserCenterFormState.rows.filter(row => {
+        const key = getUserOffTakeMonthKey(row.received_month);
+        if (UserCenterFormState.selectedYear && !key.startsWith(UserCenterFormState.selectedYear)) return false;
+        if (UserCenterFormState.selectedMonth && key.slice(5, 7) !== UserCenterFormState.selectedMonth) return false;
+        return true;
+    });
+    const period = [UserCenterFormState.selectedYear, UserCenterFormState.selectedMonth].filter(Boolean).join('-') || 'All Periods';
+    if (UserCenterFormState.section === 'claim-form') {
+        renderVisitationClaimForm(document.getElementById('cf-preview-area'), customer, rows, period);
+    } else {
+        await renderVisitationCenterForm(document.getElementById('cf-preview-area'), customer, rows, {
+            outletCode: customer.outlet_code || customer.customer_id
+        }, period, false);
+    }
+}
+
+function cfNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+function cfMoney(value) {
+    return cfNumber(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function cfQty(value) {
+    return cfNumber(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function cfPercent(value) {
+    return `${cfQty(value)}%`;
+}
+
+function cfRowTotal(row, totalKey, unitKey) {
+    const explicit = Number(row?.[totalKey]);
+    return Number.isFinite(explicit) ? explicit : cfNumber(row?.[unitKey]) * cfNumber(row?.vol_btls);
+}
+
+async function renderVisitationCenterForm(area, customer, offTakeData = [], outletMeta = {}, activePeriod = '', blank = false) {
+    let contractInfo = null;
+    if (!blank && customer?.customer_id) {
+        try {
+            const contracts = await DB.select('contract', `select=id,contract_type,start_date,end_date,principle,brands,period&customer_id=eq.${encodeURIComponent(customer.customer_id)}&order=start_date.desc&limit=1`);
+            contractInfo = contracts?.[0] || null;
+        } catch (error) { contractInfo = null; }
+    }
+    const rows = [...offTakeData].sort((a, b) => String(a.principle || '').localeCompare(String(b.principle || '')) || String(a.brand || '').localeCompare(String(b.brand || '')) || String(a.product || '').localeCompare(String(b.product || '')));
+    const firstRow = rows[0] || {};
+    const total = rows.reduce((sum, row) => {
+        const totalInc = cfRowTotal(row, 'total_price_inc_vat', 'price_inc_vat');
+        const totalExc = cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat');
+        sum.vol += cfNumber(row.vol_btls); sum.priceInc += totalInc; sum.priceExc += totalExc;
+        sum.rebate += row.rebate_amount !== null && row.rebate_amount !== undefined ? cfNumber(row.rebate_amount) : totalExc * cfNumber(row.rebate_percent) / 100;
+        return sum;
+    }, { vol: 0, priceInc: 0, priceExc: 0, rebate: 0 });
+    const campariRows = rows.filter(row => userOffTakeText(row.principle).toLowerCase() === 'campari');
+    const campari = campariRows.reduce((sum, row) => {
+        const inc = cfRowTotal(row, 'total_price_inc_vat', 'price_inc_vat'); const exc = cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat');
+        sum.vol += cfNumber(row.vol_btls); sum.priceInc += inc; sum.priceExc += exc; sum.rebate += cfNumber(row.rebate_amount) || exc * cfNumber(row.rebate_percent) / 100; return sum;
+    }, { vol: 0, priceInc: 0, priceExc: 0, rebate: 0 });
+    const outletName = blank ? '' : (customer?.outlet_name || firstRow.outlet_name || '-');
+    const legalName = blank ? '' : (customer?.company_name || customer?.company_name_th || outletName);
+    const contractPeriod = contractInfo?.start_date && contractInfo?.end_date ? `${fmtDate(contractInfo.start_date)} - ${fmtDate(contractInfo.end_date)}` : (contractInfo?.period || '-');
+    const productRows = rows.map(row => {
+        const inc = cfRowTotal(row, 'total_price_inc_vat', 'price_inc_vat'); const exc = cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat');
+        const rebate = row.rebate_amount !== null && row.rebate_amount !== undefined ? cfNumber(row.rebate_amount) : exc * cfNumber(row.rebate_percent) / 100;
+        return `<tr><td>${userOffTakeEscape(row.sku_code || '-')}</td><td>${userOffTakeEscape(row.principle || '-')}</td><td>${userOffTakeEscape(row.category || '-')}</td><td>${userOffTakeEscape(row.brand || '-')}</td><td>${userOffTakeEscape(row.sku_company || '-')}</td><td>${userOffTakeEscape(row.product || '-')}</td><td class="cf-td-center">${userOffTakeEscape(row.size || '-')}</td><td class="cf-td-center">${userOffTakeEscape(row.packing || '-')}</td><td>${userOffTakeEscape(row.wholesaler || '-')}</td><td class="cf-td-number cf-col-green">${cfMoney(row.price_inc_vat)}</td><td class="cf-td-number cf-col-green">${cfMoney(row.price_exc_vat)}</td><td class="cf-td-number cf-col-amber">${cfQty(row.vol_btls)}</td><td class="cf-td-number cf-col-amber">${cfPercent(row.rebate_percent)}</td><td class="cf-td-number">${cfMoney(inc)}</td><td class="cf-td-number">${cfMoney(exc)}</td><td class="cf-td-number cf-rebate-cell">${cfMoney(rebate)}</td></tr>`;
+    }).join('');
+    area.innerHTML = `<div class="cf-form-wrapper" id="cf-form-print-target"><div class="cf-form-header"><div class="cf-form-title-bar"><h2 class="cf-form-title">Off Take Form</h2><span>${blank ? 'Blank preview' : `${rows.length} product rows`}</span></div><div class="cf-header-grid"><div class="cf-header-col"><div class="cf-header-row"><span class="cf-header-label">Outlet Name :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(outletName)}</span></div><div class="cf-header-row"><span class="cf-header-label">Legal Name :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(legalName)}</span></div><div class="cf-header-row"><span class="cf-header-label">BDE :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(blank ? '' : (firstRow.bde || firstRow.current_bde || customer?.bde || '-'))}</span></div><div class="cf-header-row"><span class="cf-header-label">Contract Period :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(blank ? '' : contractPeriod)}</span></div><div class="cf-header-row"><span class="cf-header-label">Period :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(activePeriod)}</span></div></div><div class="cf-header-col"><div class="cf-header-row"><span class="cf-header-label">Area :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(blank ? '' : (firstRow.area || customer?.area_by_bde || customer?.province || '-'))}</span></div><div class="cf-header-row"><span class="cf-header-label">Agent :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(blank ? '' : (customer?.wholeseller_supply || firstRow.wholesaler || '-'))}</span></div><div class="cf-header-row"><span class="cf-header-label">Manager :</span><span class="cf-header-value cf-value-primary">${userOffTakeEscape(blank ? '' : (customer?.team || firstRow.current_team || '-'))}</span></div></div><div class="cf-header-summary"><table class="cf-summary-header-table"><thead><tr><th></th><th>Vol. (Btls.)</th><th>Rebate (%)</th><th>Price inc. VAT</th><th>Price ex. VAT</th><th>Rebate</th></tr></thead><tbody><tr class="cf-all-principle-row"><td>ALL PRINCIPLE</td><td class="cf-sum-num">${cfQty(total.vol)}</td><td class="cf-sum-num">-</td><td class="cf-sum-num">${cfMoney(total.priceInc)}</td><td class="cf-sum-num">${cfMoney(total.priceExc)}</td><td class="cf-sum-num cf-rebate-cell">${cfMoney(total.rebate)}</td></tr>${campariRows.length ? `<tr class="cf-principle-row"><td>Campari</td><td class="cf-sum-num">${cfQty(campari.vol)}</td><td class="cf-sum-num">-</td><td class="cf-sum-num">${cfMoney(campari.priceInc)}</td><td class="cf-sum-num">${cfMoney(campari.priceExc)}</td><td class="cf-sum-num cf-rebate-cell">${cfMoney(campari.rebate)}</td></tr>` : ''}</tbody></table></div></div></div><div class="cf-table-wrap"><table class="cf-product-table"><thead><tr><th>Code</th><th>Principle</th><th>Category</th><th>Brand</th><th>Brand Co</th><th>Product</th><th>Size</th><th>Pack</th><th>Wholesaler</th><th class="cf-col-green-head">Price Inc. VAT</th><th class="cf-col-green-head">Price Ex. VAT</th><th class="cf-col-amber-head">Vol. (Btls.)</th><th class="cf-col-amber-head">Rebate %</th><th>Total Price Inc. VAT</th><th>Total Price ex. VAT</th><th>Total Rebate</th></tr></thead><tbody>${productRows || `<tr><td colspan="16" class="cf-td-empty">${blank ? 'Select an outlet name to preview product rows.' : 'No Off Take data found for this outlet and period.'}</td></tr>`}</tbody><tfoot><tr class="cf-tfoot-total"><td colspan="11" class="cf-tfoot-label">TOTAL</td><td class="cf-sum-num">${cfQty(total.vol)}</td><td class="cf-sum-num">-</td><td class="cf-sum-num">${cfMoney(total.priceInc)}</td><td class="cf-sum-num">${cfMoney(total.priceExc)}</td><td class="cf-sum-num cf-rebate-cell">${cfMoney(total.rebate)}</td></tr></tfoot></table></div><div class="cf-form-footer"><span>Generated from Off Take data center</span><span>Outlet Code: ${userOffTakeEscape(outletMeta.outletCode || firstRow.outlet_code || customer?.outlet_code || '-')}</span></div></div>`;
+    const print = document.getElementById('btn-cf-print'); if (print) print.style.display = blank ? 'none' : '';
+}
+
+function renderVisitationClaimForm(area, customer, rows = [], period = '') {
+    if (!area) return;
+    const groups = new Map();
+    rows.forEach(row => {
+        const month = row.received_month || 'Unspecified';
+        if (!groups.has(month)) groups.set(month, []);
+        groups.get(month).push(row);
+    });
+    const totalRebate = rows.reduce((sum, row) => {
+        const totalExc = cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat');
+        return sum + (row.rebate_amount !== null && row.rebate_amount !== undefined ? cfNumber(row.rebate_amount) : totalExc * cfNumber(row.rebate_percent) / 100);
+    }, 0);
+    UserCenterFormState.claim = { customer, rows, period, totalRebate };
+    const monthCards = Array.from(groups.entries()).map(([month, monthRows]) => {
+        const rebate = monthRows.reduce((sum, row) => sum + (cfNumber(row.rebate_amount) || cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat') * cfNumber(row.rebate_percent) / 100), 0);
+        return `<div class="claim-month-card"><div style="display:flex;justify-content:space-between;gap:12px;"><strong>${userOffTakeEscape(month)}</strong><strong>THB ${cfMoney(rebate)}</strong></div><div style="margin-top:8px;color:var(--text-muted);font-size:12px;">${monthRows.length} off-take row(s) · ${cfQty(monthRows.reduce((sum, row) => sum + cfNumber(row.vol_btls), 0))} bottles</div></div>`;
+    }).join('');
+    area.innerHTML = `<div class="card" style="margin:0;"><div class="section-title">Claim Form</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;"><div><small style="color:var(--text-muted);">Outlet</small><div><strong>${userOffTakeEscape(customer?.outlet_name || 'Select an outlet')}</strong></div></div><div><small style="color:var(--text-muted);">Period</small><div><strong>${userOffTakeEscape(period || '-')}</strong></div></div></div><div style="margin-top:16px;">${monthCards || '<div class="cf-empty-state">Select an outlet name to preview claim data.</div>'}</div><div class="claim-total-card"><span>Total Rebate</span><strong>THB ${cfMoney(totalRebate)}</strong></div><button class="btn-primary" type="button" onclick="sendVisitationClaimFormRequest()" style="margin-top:14px;width:100%;" ${!customer || !rows.length ? 'disabled' : ''}>Send Claim</button></div>`;
+}
+
+window.sendVisitationClaimFormRequest = async function () {
+    const claim = UserCenterFormState.claim;
+    if (!claim?.customer || !claim.rows?.length) return toast('Please select an outlet with Off Take data.', false);
+    const now = new Date().toISOString();
+    const id = `cf-claim-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestNo = `CF-CLAIM-${Date.now().toString().slice(-6)}`;
+    const history = [{ status: 'Pending', comment: 'Claim request submitted', at: now }];
+    const payload = {
+        id,
+        request_no: requestNo,
+        form_type: 'Claim Form',
+        title: `Claim rebate ${claim.period || ''}`.trim(),
+        requester: AppState.userProfile.name || AppState.userProfile.empId || null,
+        department: AppState.userProfile.team || 'Sales',
+        outlet: claim.customer.outlet_name || claim.customer.outlet_code || null,
+        brand: 'Rebate',
+        amount: `THB ${cfMoney(claim.totalRebate)}`,
+        total_value: claim.totalRebate,
+        required_date: today(),
+        send_date: today(),
+        detail: `${claim.rows.length} rebate row(s) from Off Take data center.`,
+        priority: 'Normal',
+        status: 'Pending',
+        requester_comment: 'Claim request submitted from Visitation Center Form.',
+        history,
+        metadata: { user_id: AppState.userProfile.empId, period: claim.period },
+        created_at: now,
+        updated_at: now
+    };
+    try {
+        await DB.insert('center_form_requests', payload);
+        toast(`${requestNo} sent to OneAlchemy Approval.`);
+    } catch (error) {
+        console.error('Claim request failed:', error);
+        const pendingKey = 'visitation_center_form_pending_requests';
+        let pending = [];
+        try { pending = JSON.parse(localStorage.getItem(pendingKey) || '[]'); } catch (parseError) { pending = []; }
+        pending.unshift(payload);
+        localStorage.setItem(pendingKey, JSON.stringify(pending));
+        toast(`${requestNo} saved locally; backend approval sync is not permitted yet.`, false);
+    }
+};
+
+function renderVisitationMktYearly() {
+    const area = document.getElementById('cf-preview-area');
+    if (!area) return;
+    area.innerHTML = '<div class="cf-empty-state"><h3 style="color:var(--text-main);margin:0 0 8px;">MKT&Yearly Form</h3><p>This form type is coming soon.</p></div>';
+}
+
+const VISITATION_PRESENTATION_KEY = 'onealchemy_presentation_pdf_library';
+const VISITATION_PRESENTATION_BUCKET = 'center_forms';
+const VISITATION_PRESENTATION_META = 'presentation-library/metadata.json';
+let visitationPresentationLibrary = { folders: [], files: [] };
+
+function getVisitationSupabaseClient() {
+    if (!window.supabase) return null;
+    if (!window.__visitationPresentationClient) {
+        window.__visitationPresentationClient = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+    }
+    return window.__visitationPresentationClient;
+}
+
+function normalizeVisitationPresentationLibrary(value = {}) {
+    const folders = Array.isArray(value.folders) ? value.folders : [];
+    const files = Array.isArray(value.files) ? value.files : [];
+    if (!folders.length) folders.push({ id: 'general-promotions', name: 'General Promotions', description: 'Shared promotion PDFs for customer presentations.' });
+    return { folders, files };
+}
+
+async function loadVisitationPresentationLibrary(force = false) {
+    if (visitationPresentationLibrary.folders.length && !force) return;
+    let value = null;
+    const client = getVisitationSupabaseClient();
+    if (client) {
+        try {
+            const { data, error } = await client.storage.from(VISITATION_PRESENTATION_BUCKET).download(VISITATION_PRESENTATION_META);
+            if (!error && data) value = JSON.parse(await data.text());
+        } catch (error) { console.warn('Presentation metadata fallback:', error); }
+    }
+    if (!value) {
+        try { value = JSON.parse(localStorage.getItem(VISITATION_PRESENTATION_KEY) || 'null'); } catch (error) { value = null; }
+    }
+    visitationPresentationLibrary = normalizeVisitationPresentationLibrary(value || {});
+    if (!UserCenterFormState.presentationFolder) UserCenterFormState.presentationFolder = visitationPresentationLibrary.folders[0]?.id || '';
+}
+
+async function saveVisitationPresentationLibrary() {
+    localStorage.setItem(VISITATION_PRESENTATION_KEY, JSON.stringify(visitationPresentationLibrary));
+    const client = getVisitationSupabaseClient();
+    if (!client || !isVisitationAdmin()) return;
+    const blob = new Blob([JSON.stringify(visitationPresentationLibrary, null, 2)], { type: 'application/json' });
+    const { error } = await client.storage.from(VISITATION_PRESENTATION_BUCKET).upload(VISITATION_PRESENTATION_META, blob, { upsert: true, contentType: 'application/json' });
+    if (error) throw error;
+}
+
+window.renderVisitationPresentationLibrary = async function (force = false) {
+    const area = document.getElementById('cf-preview-area');
+    if (!area) return;
+    area.innerHTML = '<div class="center-form-card-loading">Loading presentation library...</div>';
+    try {
+        await loadVisitationPresentationLibrary(force);
+        const selected = visitationPresentationLibrary.folders.find(folder => folder.id === UserCenterFormState.presentationFolder) || visitationPresentationLibrary.folders[0];
+        UserCenterFormState.presentationFolder = selected?.id || '';
+        const files = visitationPresentationLibrary.files.filter(file => file.folderId === selected?.id);
+        area.innerHTML = `<div class="center-form-library"><aside class="presentation-folder-list"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong>Folders</strong>${isVisitationAdmin() ? '<button class="btn-secondary" type="button" onclick="createVisitationPresentationFolder()">+</button>' : ''}</div>${visitationPresentationLibrary.folders.map(folder => `<button class="presentation-folder-item${folder.id === selected?.id ? ' active' : ''}" type="button" onclick="selectVisitationPresentationFolder('${userOffTakeEscape(folder.id)}')">${userOffTakeEscape(folder.name)}</button>`).join('')}</aside><section class="presentation-file-list"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;"><div><h3 style="margin:0;">${userOffTakeEscape(selected?.name || 'Presentation Library')}</h3><p style="margin:4px 0 0;color:var(--text-muted);font-size:12px;">${userOffTakeEscape(selected?.description || '')}</p></div>${isVisitationAdmin() ? '<button class="btn-primary" type="button" onclick="document.getElementById(\'visitation-presentation-upload\').click()">Upload PDF</button><input id="visitation-presentation-upload" type="file" accept="application/pdf,.pdf" hidden onchange="uploadVisitationPresentationPdf(event)">' : ''}</div>${files.length ? files.map(file => `<div class="presentation-file-card"><div><strong>${userOffTakeEscape(file.name)}</strong><div style="font-size:11px;color:var(--text-muted);">${new Date(file.uploadedAt || Date.now()).toLocaleDateString('en-GB')}</div></div><div style="display:flex;gap:6px;"><button class="btn-secondary" type="button" onclick="openVisitationPresentationPdf('${userOffTakeEscape(file.id)}')">View</button>${isVisitationAdmin() ? `<button class="btn-secondary" type="button" onclick="deleteVisitationPresentationPdf('${userOffTakeEscape(file.id)}')">Delete</button>` : ''}</div></div>`).join('') : '<div class="cf-empty-state">No presentation PDFs in this folder.</div>'}</section></div>`;
+    } catch (error) {
+        area.innerHTML = `<div class="cf-preview-error">${userOffTakeEscape(error.message)}</div>`;
+    }
+};
+
+window.selectVisitationPresentationFolder = function (folderId) {
+    UserCenterFormState.presentationFolder = folderId;
+    renderVisitationPresentationLibrary();
+};
+
+window.createVisitationPresentationFolder = async function () {
+    if (!isVisitationAdmin()) return;
+    const name = prompt('Folder name');
+    if (!userOffTakeText(name)) return;
+    const folder = { id: `folder-${Date.now()}`, name: userOffTakeText(name), description: '', createdAt: new Date().toISOString() };
+    visitationPresentationLibrary.folders.push(folder);
+    UserCenterFormState.presentationFolder = folder.id;
+    await saveVisitationPresentationLibrary();
+    renderVisitationPresentationLibrary();
+};
+
+window.uploadVisitationPresentationPdf = async function (event) {
+    if (!isVisitationAdmin()) return;
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const client = getVisitationSupabaseClient();
+    if (!client) return toast('Supabase storage is unavailable.', false);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-');
+    const path = `presentation-library/files/${UserCenterFormState.presentationFolder}/${Date.now()}-${safeName}`;
+    const { error } = await client.storage.from(VISITATION_PRESENTATION_BUCKET).upload(path, file, { upsert: false, contentType: 'application/pdf' });
+    if (error) return toast('Upload failed: ' + error.message, false);
+    visitationPresentationLibrary.files.push({ id: `pdf-${Date.now()}`, folderId: UserCenterFormState.presentationFolder, name: file.name, storagePath: path, size: file.size, uploadedAt: new Date().toISOString() });
+    await saveVisitationPresentationLibrary();
+    renderVisitationPresentationLibrary();
+};
+
+window.openVisitationPresentationPdf = async function (fileId) {
+    const file = visitationPresentationLibrary.files.find(item => item.id === fileId);
+    const client = getVisitationSupabaseClient();
+    if (!file || !client) return;
+    const { data, error } = await client.storage.from(VISITATION_PRESENTATION_BUCKET).download(file.storagePath);
+    if (error) return toast('Unable to open PDF: ' + error.message, false);
+    window.open(URL.createObjectURL(data), '_blank', 'noopener');
+};
+
+window.deleteVisitationPresentationPdf = async function (fileId) {
+    if (!isVisitationAdmin()) return;
+    const file = visitationPresentationLibrary.files.find(item => item.id === fileId);
+    if (!file || !confirm(`Delete ${file.name}?`)) return;
+    const client = getVisitationSupabaseClient();
+    if (client) await client.storage.from(VISITATION_PRESENTATION_BUCKET).remove([file.storagePath]);
+    visitationPresentationLibrary.files = visitationPresentationLibrary.files.filter(item => item.id !== fileId);
+    await saveVisitationPresentationLibrary();
+    renderVisitationPresentationLibrary();
+};
+
+window.refreshCenterFormPreviewData = async function () {
+    UserCenterFormState.initialized = false;
+    VisitationOneAlchemyState.outletsLoaded = false;
+    await initCenterFormOffTake(true);
+    toast('Center Form preview data refreshed.');
+};
+
+window.printCenterForm = function () {
+    const target = document.getElementById('cf-form-print-target');
+    if (!target) return;
+    const popup = window.open('', '_blank', 'width=1200,height=800');
+    popup.document.write(`<!doctype html><html><head><title>Off Take Form Preview</title><style>body{font-family:Arial,sans-serif;margin:0;padding:14px;color:#151515;font-size:11px}.cf-form-title-bar,.cf-form-footer{display:flex;justify-content:space-between}.cf-header-grid{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:16px}.cf-header-row{display:flex;gap:8px;margin-bottom:4px}.cf-header-label{min-width:108px;font-weight:800}.cf-value-primary{color:#1d4ed8;font-weight:800}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d4d4d8;padding:4px 5px}.cf-product-table{font-size:9px;margin-top:10px}.cf-product-table th{background:#6b7280;color:#fff}.cf-td-number,.cf-sum-num{text-align:right}.cf-col-green,.cf-col-green-head{background:#d9ead3!important;color:#151515!important}.cf-col-amber,.cf-col-amber-head,.cf-all-principle-row td{background:#fff2cc!important;color:#151515!important}.cf-tfoot-total td{font-weight:800;background:#f3f4f6}</style></head><body>${target.innerHTML}</body></html>`);
+    popup.document.close(); popup.focus(); setTimeout(() => popup.print(), 300);
+};
