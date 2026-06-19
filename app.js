@@ -443,7 +443,7 @@ async function loadCustomerDropdown() {
             plugins: ['clear_button'],
             render: {
                 option: function (item, escape) {
-                    return `<div><span style="color:var(--text-muted);font-size:11px;margin-right:6px;">${escape(item.value)}</span>${escape(item.text)}</div>`;
+                    return `<div>${escape(item.text)}</div>`;
                 },
                 item: function (item, escape) {
                     return `<div>${escape(item.text)}</div>`;
@@ -1296,7 +1296,7 @@ function showMainApp() {
     }, 1500);
 }
 
-window.switchTab = function (tab) {
+window.switchTab = function (tab, fromHistory = false) {
     if (tab !== 'new') window.stopCamera();
 
     const tabs = ['new', 'list', 'calendar', 'outlet-master', 'offtake', 'center-form'];
@@ -1357,8 +1357,22 @@ window.switchTab = function (tab) {
         }, 100);
     }
 
+    if (!fromHistory) {
+        try {
+            const method = (history.state && history.state.vtab) ? 'pushState' : 'replaceState';
+            history[method]({ vtab: tab }, '', '#' + tab);
+        } catch (error) { /* history unavailable */ }
+    }
     setVisitationSidebarOpen(false);
 };
+
+// Browser Back/Forward navigates between tabs.
+window.addEventListener('popstate', function (event) {
+    const app = document.getElementById('main-app');
+    if (app && app.style.display === 'none') return;
+    const tab = (event.state && event.state.vtab) || 'new';
+    window.switchTab(tab, true);
+});
 
 window.toggleSidebar = function () {
     const sidebar = document.querySelector('.sidebar');
@@ -2069,11 +2083,19 @@ document.addEventListener('DOMContentLoaded', () => {
 // REALTIME NOTIFICATION & CALENDAR MODULE (Supabase Edition)
 // ============================================================
 
+function getVisitationSupabaseClient() {
+    if (!window.supabase) return null;
+    if (!window.__visitationSupabaseClient) {
+        window.__visitationSupabaseClient = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+    }
+    return window.__visitationSupabaseClient;
+}
+
 window.setupRealtime = function () {
     if (AppState.realtimeChannel) return;
     try {
         if (typeof window.supabase !== 'undefined') {
-            const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+            const client = getVisitationSupabaseClient();
             AppState.realtimeChannel = client
                 .channel('app-realtime')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'visitation' }, (payload) => {
@@ -2117,7 +2139,7 @@ window.setupVisitRealtime = function () {
     if (typeof window.supabase === 'undefined') return;
     try {
         const empId = AppState.userProfile.empId;
-        const client = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+        const client = getVisitationSupabaseClient();
         AppState.visitRealtimeChannel = client
             .channel('visit-records-realtime')
             .on('postgres_changes', {
@@ -2912,7 +2934,7 @@ async function loadAptOutlets(selectValue) {
             plugins: ['clear_button'],
             render: {
                 option: function (item, escape) {
-                    return `<div><span style="color:var(--text-muted);font-size:11px;margin-right:6px;">${escape(item.value)}</span>${escape(item.text)}</div>`;
+                    return `<div>${escape(item.text)}</div>`;
                 },
                 item: function (item, escape) {
                     return `<div>${escape(item.text)}</div>`;
@@ -3311,12 +3333,12 @@ async function loadUserOffTakeMasters(force = false) {
         UserOffTakeState.identity = identity;
 
         outletSelect.innerHTML = '<option value="">-- Select outlet --</option>' + UserOffTakeState.outlets.map(row =>
-            `<option value="${userOffTakeEscape(row.customer_id)}">${userOffTakeEscape(row.outlet_code || row.customer_id)} - ${userOffTakeEscape(row.outlet_name || 'Unnamed outlet')}</option>`
+            `<option value="${userOffTakeEscape(row.customer_id)}">${userOffTakeEscape(row.outlet_name || 'Unnamed outlet')}</option>`
         ).join('');
         productSelect.innerHTML = '<option value="">-- Select product --</option>' + UserOffTakeState.products.map(row => {
             const code = getUserProductCode(row);
             const name = row.product_name || row.name_for_express || code;
-            return `<option value="${userOffTakeEscape(code)}">${userOffTakeEscape(code)} - ${userOffTakeEscape(name)}</option>`;
+            return `<option value="${userOffTakeEscape(code)}">${userOffTakeEscape(name)}</option>`;
         }).join('');
         wholesalerSelect.innerHTML = '<option value="">-- Select wholesaler --</option>' + UserOffTakeState.wholesalers.map(row => {
             const name = getUserWholesalerName(row);
@@ -3842,6 +3864,7 @@ window.renderVisitationOffTake = function () {
     if (info) info.textContent = `Showing ${rows.length.toLocaleString('en-US')} of ${VisitationOneAlchemyState.offTakeRows.length.toLocaleString('en-US')} off-take rows${isVisitationAdmin() ? ' (Admin: all data)' : ' (your data only)'}`;
 };
 
+let visitationCenterFormOutletSelect = null;
 window.initCenterFormOffTake = async function (force = false) {
     const outletSelect = document.getElementById('cf-outlet-select');
     if (!outletSelect) return;
@@ -3853,8 +3876,17 @@ window.initCenterFormOffTake = async function (force = false) {
         if (identity !== getVisitationIdentity()) return;
         UserCenterFormState.customers = customers;
         outletSelect.innerHTML = '<option value="">Select outlet name...</option>' + customers.map(row =>
-            `<option value="${userOffTakeEscape(row.customer_id)}">${userOffTakeEscape(row.outlet_code || row.customer_id)} - ${userOffTakeEscape(row.outlet_name || 'Unspecified')}</option>`
+            `<option value="${userOffTakeEscape(row.customer_id)}">${userOffTakeEscape(row.outlet_name || 'Unspecified')}</option>`
         ).join('');
+        if (window.TomSelect) {
+            try { visitationCenterFormOutletSelect?.destroy(); } catch (error) { /* re-init below */ }
+            visitationCenterFormOutletSelect = new TomSelect('#cf-outlet-select', {
+                create: false, placeholder: 'Search outlet name...',
+                onChange: () => loadCFPreview()
+            });
+        } else {
+            outletSelect.onchange = () => loadCFPreview();
+        }
         UserCenterFormState.initialized = true;
         UserCenterFormState.identity = identity;
         renderCenterFormBlank();
@@ -3909,11 +3941,18 @@ window.setVisitationCenterFormSection = function (section) {
     const title = document.getElementById('center-form-page-title');
     if (title) title.textContent = titleMap[UserCenterFormState.section];
     const controls = document.querySelector('#tab-center-form .center-form-preview-controls');
-    if (controls) controls.style.display = UserCenterFormState.section === 'presentation' ? 'none' : 'grid';
+    // Claim Form has its own in-page outlet search, so hide the duplicate top controls.
+    if (controls) controls.style.display = (UserCenterFormState.section === 'presentation' || UserCenterFormState.section === 'claim-form') ? 'none' : 'grid';
+    if (UserCenterFormState.section === 'claim-form') { visitationClaimContractId = ''; visitationClaimMonthPage = 1; }
     const print = document.getElementById('btn-cf-print');
     if (print && UserCenterFormState.section !== 'off-take') print.style.display = 'none';
-    if (UserCenterFormState.section === 'presentation') renderVisitationPresentationLibrary();
-    else if (UserCenterFormState.section === 'mkt-yearly-form') renderVisitationMktYearly();
+    if (UserCenterFormState.section !== 'presentation') stopVisitationPresentationSync();
+    if (UserCenterFormState.section === 'presentation') {
+        renderVisitationPresentationLibrary(true);
+        startVisitationPresentationSync();
+    } else if (UserCenterFormState.section === 'mkt-yearly-form') {
+        renderVisitationMktYearly();
+    }
     else if (UserCenterFormState.centerCustomerId) renderCurrentCenterForm();
     else renderCenterFormBlank();
 };
@@ -3967,7 +4006,7 @@ async function renderCurrentCenterForm() {
     });
     const period = [UserCenterFormState.selectedYear, UserCenterFormState.selectedMonth].filter(Boolean).join('-') || 'All Periods';
     if (UserCenterFormState.section === 'claim-form') {
-        await renderVisitationClaimFormExact(document.getElementById('cf-preview-area'), customer, rows, period);
+        await renderVisitationClaimFormExact(document.getElementById('cf-preview-area'), customer, UserCenterFormState.rows, period);
     } else {
         await renderVisitationCenterForm(document.getElementById('cf-preview-area'), customer, rows, {
             outletCode: customer.outlet_code || customer.customer_id
@@ -4031,18 +4070,234 @@ async function renderVisitationCenterForm(area, customer, offTakeData = [], outl
     const print = document.getElementById('btn-cf-print'); if (print) print.style.display = blank ? 'none' : '';
 }
 
+// ============================================================
+// CLAIM FORM — ported to match the OneAlchemy contract web (UI / UX / logic)
+// ============================================================
+const VISITATION_CLAIM_MONTHS_PER_PAGE = 6;
+let visitationClaimContractId = '';
+let visitationClaimMonthPage = 1;
+let visitationClaimActiveData = null;
+let visitationClaimOutletSelect = null;
+
+function visitationClaimMonthSerialFromKey(key) {
+    if (!/^\d{4}-\d{2}$/.test(key || '')) return null;
+    return Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7));
+}
+
+const VISITATION_CLAIM_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Tolerant month parser — accepts "2026-04", "Apr-26", "Apr 2026", "April 2026",
+// "2026-04-01", "04/2026", etc. so synced Off Take rows always match a contract period.
+function visitationClaimReceivedSerial(value) {
+    const fromKey = visitationClaimMonthSerialFromKey(getUserOffTakeMonthKey(value));
+    if (fromKey !== null) return fromKey;
+    const text = userOffTakeText(value).trim();
+    if (!text) return null;
+    let m = text.match(/(\d{4})[-/.](\d{1,2})(?![\d])/);
+    if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) return Number(m[1]) * 12 + Number(m[2]);
+    m = text.match(/^(\d{1,2})[-/.](\d{4})$/);
+    if (m && Number(m[1]) >= 1 && Number(m[1]) <= 12) return Number(m[2]) * 12 + Number(m[1]);
+    m = text.toLowerCase().match(/([a-z]{3,9})[\s\-/.]+(\d{2,4})/);
+    if (m) {
+        const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(m[1].slice(0, 3)) + 1;
+        if (month) return (m[2].length === 2 ? 2000 + Number(m[2]) : Number(m[2])) * 12 + month;
+    }
+    const d = new Date(text);
+    if (!Number.isNaN(d.getTime())) return d.getFullYear() * 12 + (d.getMonth() + 1);
+    return null;
+}
+
+function visitationClaimMonthLabel(value) {
+    const serial = visitationClaimReceivedSerial(value);
+    if (serial === null) return userOffTakeText(value) || 'No Period';
+    const month = ((serial - 1) % 12) + 1;
+    const year = (serial - month) / 12;
+    return `${VISITATION_CLAIM_MONTH_NAMES[month - 1]}-${String(year).slice(-2)}`;
+}
+
+function visitationClaimDateMonthSerial(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.getFullYear() * 12 + (d.getMonth() + 1);
+}
+
+function visitationClaimContractValue(contract, index = 0) {
+    return String(contract?.id || `${contract?.start_date || 'no-start'}|${contract?.end_date || 'no-end'}|${index}`);
+}
+
+function visitationClaimContractDateRange(contract) {
+    if (contract?.start_date && contract?.end_date) return `${fmtDate(contract.start_date)} - ${fmtDate(contract.end_date)}`;
+    if (contract?.period) return contract.period;
+    if (contract?.start_date) return `Start ${fmtDate(contract.start_date)}`;
+    if (contract?.end_date) return `End ${fmtDate(contract.end_date)}`;
+    return '-';
+}
+
+function visitationClaimContractStatus(contract) {
+    const explicit = userOffTakeText(contract?.status_of_doc);
+    if (explicit) return explicit.toLowerCase().includes('active') ? 'Contract Active' : explicit;
+    const end = contract?.end_date ? new Date(contract.end_date) : null;
+    if (end && !Number.isNaN(end.getTime()) && end < new Date()) return 'Contract Expired';
+    return 'Contract Active';
+}
+
+function isVisitationClaimRowInContract(row, contract) {
+    const rowSerial = visitationClaimReceivedSerial(row?.received_month);
+    if (rowSerial === null) return false;
+    const startSerial = visitationClaimDateMonthSerial(contract?.start_date);
+    const endSerial = visitationClaimDateMonthSerial(contract?.end_date);
+    if (startSerial === null && endSerial === null) return false;
+    if (startSerial !== null && rowSerial < startSerial) return false;
+    if (endSerial !== null && rowSerial > endSerial) return false;
+    return true;
+}
+
+function getSelectedVisitationClaimContract(contractRows = []) {
+    if (!visitationClaimContractId) return null;
+    return contractRows.find((contract, index) => visitationClaimContractValue(contract, index) === visitationClaimContractId) || null;
+}
+
+function filterVisitationClaimRows(rows = [], contractRows = []) {
+    const selected = getSelectedVisitationClaimContract(contractRows);
+    if (selected) return rows.filter(row => isVisitationClaimRowInContract(row, selected));
+    if (!contractRows.length) return [];
+    return rows.filter(row => contractRows.some(contract => isVisitationClaimRowInContract(row, contract)));
+}
+
+function visitationClaimRebate(row) {
+    if (row.rebate_amount !== null && row.rebate_amount !== undefined && row.rebate_amount !== '') return cfNumber(row.rebate_amount);
+    return cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat') * (cfNumber(row.rebate_percent) / 100);
+}
+
+function buildVisitationClaimMonthCards(rows = []) {
+    const groups = new Map();
+    rows.forEach(row => {
+        const serial = visitationClaimReceivedSerial(row.received_month);
+        const key = serial === null ? `raw:${userOffTakeText(row.received_month)}` : String(serial);
+        if (!groups.has(key)) groups.set(key, { serial, sample: row.received_month, rows: [] });
+        groups.get(key).rows.push(row);
+    });
+    return Array.from(groups.values())
+        .sort((a, b) => (a.serial ?? -Infinity) - (b.serial ?? -Infinity))
+        .map(group => ({
+            label: visitationClaimMonthLabel(group.sample),
+            priceExc: group.rows.reduce((sum, row) => sum + cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat'), 0),
+            rebate: group.rows.reduce((sum, row) => sum + visitationClaimRebate(row), 0)
+        }));
+}
+
+function visitationClaimPageCount(cards = []) {
+    return Math.max(1, Math.ceil(cards.length / VISITATION_CLAIM_MONTHS_PER_PAGE));
+}
+
+function renderVisitationClaimMonthCards(monthCards = [], contractRows = []) {
+    if (!monthCards.length) {
+        return `<section class="claim-month-card claim-month-empty"><div class="claim-month-title">${contractRows.length ? 'No Off Take data found for this outlet and contract period.' : 'No contract period found for this outlet.'}</div></section>`;
+    }
+    const pageCount = visitationClaimPageCount(monthCards);
+    visitationClaimMonthPage = Math.min(Math.max(1, Number(visitationClaimMonthPage) || 1), pageCount);
+    const start = (visitationClaimMonthPage - 1) * VISITATION_CLAIM_MONTHS_PER_PAGE;
+    const cards = monthCards.slice(start, start + VISITATION_CLAIM_MONTHS_PER_PAGE).map(item => `<section class="claim-month-card"><div class="claim-month-title">${userOffTakeEscape(item.label)}</div><div class="claim-amount-grid"><div class="claim-amount-row"><span>Total Price Ex. VAT</span><strong>${cfMoney(item.priceExc)}<small>&#3647;</small></strong></div><div class="claim-rebate-row"><span class="claim-rebate-label">Rebate</span><strong>${cfQty(item.rebate)}<small>&#3647;</small></strong></div></div></section>`).join('');
+    const pager = pageCount > 1 ? `<div class="claim-book-pager"><button type="button" onclick="setVisitationClaimMonthPage(${visitationClaimMonthPage - 1})" ${visitationClaimMonthPage <= 1 ? 'disabled' : ''}>Previous</button><span>Page ${visitationClaimMonthPage} of ${pageCount}</span><button type="button" onclick="setVisitationClaimMonthPage(${visitationClaimMonthPage + 1})" ${visitationClaimMonthPage >= pageCount ? 'disabled' : ''}>Next</button></div>` : '';
+    return cards + pager;
+}
+
+function renderVisitationClaimPeriodOptions(contractRows = []) {
+    const values = contractRows.map((contract, index) => visitationClaimContractValue(contract, index));
+    if (visitationClaimContractId && !values.includes(visitationClaimContractId)) visitationClaimContractId = '';
+    const selected = visitationClaimContractId;
+    return `<option value=""${selected ? '' : ' selected'}>All Contract Periods</option>` + contractRows.map((contract, index) => {
+        const value = visitationClaimContractValue(contract, index);
+        const type = contract.contract_type ? `${contract.contract_type} | ` : '';
+        return `<option value="${userOffTakeEscape(value)}"${selected === value ? ' selected' : ''}>${userOffTakeEscape(type + visitationClaimContractDateRange(contract))}</option>`;
+    }).join('');
+}
+
+function visitationClaimPeriodRange(contractRows = []) {
+    const selected = getSelectedVisitationClaimContract(contractRows);
+    if (selected) return visitationClaimContractDateRange(selected);
+    return contractRows.length ? 'All Contract Periods' : 'No Contract Period';
+}
+
+function updateVisitationClaimFromCache() {
+    if (!visitationClaimActiveData) return;
+    const { customer, sourceRows, contractRows } = visitationClaimActiveData;
+    const rows = filterVisitationClaimRows(sourceRows, contractRows);
+    const monthCards = buildVisitationClaimMonthCards(rows);
+    const totalRebate = rows.reduce((sum, row) => sum + visitationClaimRebate(row), 0);
+    const list = document.querySelector('#cf-form-print-target .claim-month-list');
+    if (list) list.innerHTML = renderVisitationClaimMonthCards(monthCards, contractRows);
+    const total = document.querySelector('#cf-form-print-target .claim-total-card strong');
+    if (total) total.innerHTML = `${cfQty(totalRebate)}<small>&#3647;</small>`;
+    const sendBtn = document.querySelector('#cf-form-print-target .claim-send-btn');
+    if (sendBtn) sendBtn.disabled = !monthCards.length;
+    UserCenterFormState.claim = { customer, rows, period: visitationClaimPeriodRange(contractRows), totalRebate };
+}
+
+window.setVisitationClaimMonthPage = function (page) {
+    visitationClaimMonthPage = Number(page) || 1;
+    updateVisitationClaimFromCache();
+};
+
+window.setVisitationClaimPeriod = function (value) {
+    visitationClaimContractId = String(value || '');
+    visitationClaimMonthPage = 1;
+    updateVisitationClaimFromCache();
+};
+
+function destroyVisitationClaimOutletSelect() {
+    if (!visitationClaimOutletSelect) return;
+    try { visitationClaimOutletSelect.destroy(); } catch (error) { /* already gone */ }
+    visitationClaimOutletSelect = null;
+}
+
+function initVisitationClaimOutletSearch(selectedValue = '') {
+    const el = document.getElementById('claim-outlet-search-select');
+    if (!el) return;
+    destroyVisitationClaimOutletSelect();
+    const options = (UserCenterFormState.customers || []).map(row => ({
+        value: String(row.customer_id),
+        text: row.outlet_name || row.customer_id || 'Unspecified'
+    }));
+    el.innerHTML = '<option value="">Search Outlet...</option>' + options.map(option => `<option value="${userOffTakeEscape(option.value)}">${userOffTakeEscape(option.text)}</option>`).join('');
+    if (selectedValue) el.value = selectedValue;
+    const setOutlet = value => {
+        visitationClaimContractId = '';
+        visitationClaimMonthPage = 1;
+        const centerSelect = document.getElementById('cf-outlet-select');
+        if (centerSelect) centerSelect.value = value || '';
+        loadCFPreview();
+    };
+    if (window.TomSelect) {
+        visitationClaimOutletSelect = new TomSelect('#claim-outlet-search-select', {
+            options, valueField: 'value', labelField: 'text', searchField: ['text'],
+            placeholder: 'Search Outlet...', create: false,
+            render: { option: (data, escape) => `<div class="claim-outlet-option">${escape(data.text || '')}</div>` },
+            onChange: setOutlet
+        });
+        if (selectedValue) visitationClaimOutletSelect.setValue(selectedValue, true);
+    } else {
+        el.onchange = () => setOutlet(el.value);
+    }
+}
+
 async function renderVisitationClaimFormExact(area, customer, rows = [], period = '') {
     if (!area) return;
+    const isBlank = !customer;
     let contracts = [];
     if (customer?.customer_id) {
         try {
             contracts = await DB.select('contract', `select=id,contract_type,start_date,end_date,principle,brands,status_of_doc,promotion,trade_deal,period&customer_id=eq.${encodeURIComponent(customer.customer_id)}&order=start_date.desc&limit=100`);
         } catch (error) { contracts = []; }
     }
-    const first = rows[0] || {};
-    const outletName = customer?.outlet_name || first.outlet_name || '';
+    const sourceRows = [...rows];
+    const filteredRows = isBlank ? [] : filterVisitationClaimRows(sourceRows, contracts);
+    const first = filteredRows[0] || sourceRows[0] || {};
+    const outletName = isBlank ? '' : (customer?.outlet_name || first.outlet_name || '');
+    const outletCode = isBlank ? '' : (customer?.outlet_code || customer?.customer_id || first.outlet_code || '-');
     const profile = [
-        ['Code', customer?.outlet_code || customer?.customer_id || first.outlet_code],
+        ['Code', outletCode],
         ['Outlet', outletName],
         ['Type', customer?.alchemy_outlet_type || customer?.alchemy_sub_type],
         ['Group', customer?.group_name || customer?.group_code || first.outlet_group],
@@ -4051,29 +4306,36 @@ async function renderVisitationClaimFormExact(area, customer, rows = [], period 
         ['Area', first.area || customer?.area_by_bde || customer?.province],
         ['Wholesaler', customer?.wholeseller_supply || first.wholesaler]
     ];
-    const profileHtml = customer ? `<dl class="claim-detail-list">${profile.map(([label, value]) => `<div class="claim-detail-item"><dt>${label}</dt><dd>${userOffTakeEscape(value || '-')}</dd></div>`).join('')}</dl>` : '<span class="claim-muted">Select outlet to view profile.</span>';
-    const contractHtml = contracts.length ? `<div class="claim-contract-list">${contracts.map(contract => `<article class="claim-contract-row"><div class="claim-contract-row-head"><strong>${userOffTakeEscape(contract.contract_type || 'Contract')}</strong><span class="${userOffTakeText(contract.status_of_doc).toLowerCase().includes('active') ? 'claim-contract-status-active' : 'claim-contract-status-expired'}">${userOffTakeEscape(contract.status_of_doc || '-')}</span></div><div class="claim-contract-period">${userOffTakeEscape(contract.start_date || '-')} - ${userOffTakeEscape(contract.end_date || '-')}</div><div class="claim-contract-promotion">${userOffTakeEscape(contract.promotion || contract.trade_deal || '-')}</div><div class="claim-contract-meta"><span>${userOffTakeEscape(contract.principle || contract.brands || '-')}</span></div></article>`).join('')}</div>` : `<span class="claim-contract-empty">${customer ? 'No contract records found.' : 'Select outlet to view contracts.'}</span>`;
-    const monthGroups = new Map();
-    rows.forEach(row => {
-        const month = row.received_month || 'Unspecified';
-        if (!monthGroups.has(month)) monthGroups.set(month, []);
-        monthGroups.get(month).push(row);
-    });
-    let totalRebate = 0;
-    const monthHtml = Array.from(monthGroups.entries()).map(([month, monthRows]) => {
-        const volume = monthRows.reduce((sum, row) => sum + cfNumber(row.vol_btls), 0);
-        const inc = monthRows.reduce((sum, row) => sum + cfRowTotal(row, 'total_price_inc_vat', 'price_inc_vat'), 0);
-        const exc = monthRows.reduce((sum, row) => sum + cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat'), 0);
-        const rebate = monthRows.reduce((sum, row) => sum + (cfNumber(row.rebate_amount) || cfRowTotal(row, 'total_price_exc_vat', 'price_exc_vat') * cfNumber(row.rebate_percent) / 100), 0);
-        totalRebate += rebate;
-        return `<section class="claim-month-card"><div class="claim-month-title">${userOffTakeEscape(month)}</div><div class="claim-amount-grid"><div class="claim-amount-row"><span>Volume</span><strong>${cfQty(volume)} Btls.</strong></div><div class="claim-amount-row"><span>Price inc. VAT</span><strong>${cfMoney(inc)}</strong></div><div class="claim-amount-row"><span>Price ex. VAT</span><strong>${cfMoney(exc)}</strong></div></div><div class="claim-rebate-row"><span class="claim-rebate-label">Rebate</span><strong>${cfMoney(rebate)}<small> THB</small></strong></div></section>`;
-    }).join('');
-    UserCenterFormState.claim = { customer, rows, period, totalRebate };
-    area.innerHTML = `<div class="claim-form-page" id="cf-form-print-target"><div class="claim-form-search"><select disabled><option>${userOffTakeEscape(outletName || 'Select Outlet')}</option></select></div><div class="claim-outlet-bar"><span>${userOffTakeEscape(outletName || 'Select Outlet')}</span></div><div class="claim-info-grid"><section class="claim-info-card claim-info-card--profile"><div class="claim-card-title">Profile Outlet</div><div class="claim-card-value">${profileHtml}</div></section><section class="claim-info-card claim-info-card--contract"><div class="claim-card-title">Contract <small>${contracts.length ? `${contracts.length} record${contracts.length === 1 ? '' : 's'}` : ''}</small></div><div class="claim-card-value">${contractHtml}</div></section></div><div class="claim-period-row"><span>Claim period contract</span><label class="claim-period-pill"><select disabled><option>${userOffTakeEscape(period || 'All Contract Periods')}</option></select></label></div><div class="claim-month-list">${monthHtml || '<div class="claim-month-empty">Select an outlet with Off Take data to calculate claim.</div>'}</div><div class="claim-total-card"><span>Total Rebate</span><strong>${cfMoney(totalRebate)}<small> THB</small></strong></div><button class="claim-send-btn" type="button" onclick="sendVisitationClaimFormRequest()" ${!customer || !rows.length ? 'disabled' : ''}>Send Claim</button></div>`;
+    const profileHtml = isBlank
+        ? '<span class="claim-muted">Select outlet to view profile.</span>'
+        : `<dl class="claim-detail-list">${profile.map(([label, value]) => `<div class="claim-detail-item"><dt>${userOffTakeEscape(label)}</dt><dd>${userOffTakeEscape(value || '-')}</dd></div>`).join('')}</dl>`;
+    const contractHtml = isBlank
+        ? '<span class="claim-muted">Select outlet to view contracts.</span>'
+        : (contracts.length ? `<div class="claim-contract-list">${contracts.map(contract => {
+            const status = visitationClaimContractStatus(contract);
+            return `<article class="claim-contract-row"><div class="claim-contract-row-head"><strong>${userOffTakeEscape(contract.contract_type || 'Contract')}</strong><span class="${status === 'Contract Active' ? 'claim-contract-status-active' : 'claim-contract-status-expired'}">${userOffTakeEscape(status)}</span></div><div class="claim-contract-period">${userOffTakeEscape(visitationClaimContractDateRange(contract))}</div><div class="claim-contract-promotion">${userOffTakeEscape(contract.promotion || contract.trade_deal || 'No Promotion')}</div><div class="claim-contract-meta"><span>${userOffTakeEscape(contract.principle || contract.brands || '-')}</span></div></article>`;
+        }).join('')}</div>` : '<span class="claim-contract-empty">No contract records found.</span>');
+    const monthCards = buildVisitationClaimMonthCards(filteredRows);
+    const totalRebate = filteredRows.reduce((sum, row) => sum + visitationClaimRebate(row), 0);
+    visitationClaimActiveData = isBlank ? null : { customer, sourceRows, contractRows: contracts, period };
+    UserCenterFormState.claim = { customer, rows: filteredRows, period: visitationClaimPeriodRange(contracts), totalRebate };
+    destroyVisitationClaimOutletSelect();
+    area.innerHTML = `<div class="claim-form-page" id="cf-form-print-target">
+        <div class="claim-form-search"><select id="claim-outlet-search-select"></select></div>
+        <div class="claim-outlet-bar"><span>${userOffTakeEscape(outletName || 'Select Outlet')}</span></div>
+        <div class="claim-info-grid">
+            <section class="claim-info-card claim-info-card--profile"><div class="claim-card-title">Profile Outlet</div><div class="claim-card-value">${profileHtml}</div></section>
+            <section class="claim-info-card claim-info-card--contract"><div class="claim-card-title">Contract <small>${contracts.length ? `${contracts.length} record${contracts.length === 1 ? '' : 's'}` : ''}</small></div><div class="claim-card-value">${contractHtml}</div></section>
+        </div>
+        <div class="claim-period-row"><span>Claim period contract</span><label class="claim-period-pill"><select id="claim-period-select" onchange="setVisitationClaimPeriod(this.value)" ${isBlank ? 'disabled' : ''}>${renderVisitationClaimPeriodOptions(contracts)}</select></label></div>
+        <div class="claim-month-list">${renderVisitationClaimMonthCards(monthCards, contracts)}</div>
+        <div class="claim-total-card"><span>Total Rebate</span><strong>${cfQty(totalRebate)}<small>&#3647;</small></strong></div>
+        <button class="claim-send-btn" type="button" onclick="sendVisitationClaimFormRequest()" ${isBlank || !monthCards.length ? 'disabled' : ''}>Send Claim</button>
+    </div>`;
+    initVisitationClaimOutletSearch(isBlank ? '' : String(customer.customer_id));
     const print = document.getElementById('btn-cf-print');
-    if (print) print.style.display = customer ? '' : 'none';
+    if (print) print.style.display = isBlank ? 'none' : '';
 }
-
 function renderVisitationClaimForm(area, customer, rows = [], period = '') {
     if (!area) return;
     const groups = new Map();
@@ -4147,14 +4409,25 @@ const VISITATION_PRESENTATION_KEY = 'onealchemy_presentation_pdf_library';
 const VISITATION_PRESENTATION_BUCKET = 'center_forms';
 const VISITATION_PRESENTATION_META = 'presentation-library/metadata.json';
 let visitationPresentationLibrary = { folders: [], files: [] };
+let visitationOffTakeWholesalerSelect = null;
+let visitationOffTakeOutletSelect = null;
+let visitationPresentationSyncTimer = null;
 
-function getVisitationSupabaseClient() {
-    if (!window.supabase) return null;
-    if (!window.__visitationPresentationClient) {
-        window.__visitationPresentationClient = window.supabase.createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
-    }
-    return window.__visitationPresentationClient;
+function stopVisitationPresentationSync() {
+    if (visitationPresentationSyncTimer) clearInterval(visitationPresentationSyncTimer);
+    visitationPresentationSyncTimer = null;
 }
+
+function startVisitationPresentationSync() {
+    stopVisitationPresentationSync();
+    visitationPresentationSyncTimer = setInterval(() => {
+        if (UserCenterFormState.section === 'presentation' && !document.hidden) renderVisitationPresentationLibrary(true);
+    }, 30000);
+}
+
+window.addEventListener('focus', () => {
+    if (UserCenterFormState.section === 'presentation') renderVisitationPresentationLibrary(true);
+});
 
 function normalizeVisitationPresentationLibrary(value = {}) {
     const folders = Array.isArray(value.folders) ? value.folders : [];
@@ -4177,6 +4450,7 @@ async function loadVisitationPresentationLibrary(force = false) {
         try { value = JSON.parse(localStorage.getItem(VISITATION_PRESENTATION_KEY) || 'null'); } catch (error) { value = null; }
     }
     visitationPresentationLibrary = normalizeVisitationPresentationLibrary(value || {});
+    try { localStorage.setItem(VISITATION_PRESENTATION_KEY, JSON.stringify(visitationPresentationLibrary)); } catch (error) { /* read-only cache */ }
     if (!UserCenterFormState.presentationFolder) UserCenterFormState.presentationFolder = visitationPresentationLibrary.folders[0]?.id || '';
 }
 
@@ -4325,6 +4599,31 @@ window.downloadVisitationPresentationPdf = async function (fileId) {
     link.download = file.name || 'promotion.pdf';
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+
+// Visitation is a read-only view of the shared OneAlchemy promotion library.
+window.renderVisitationPresentationLibrary = async function (force = false) {
+    const area = document.getElementById('cf-preview-area');
+    if (!area) return;
+    area.innerHTML = '<div class="center-form-card-loading">Loading promotion folders...</div>';
+    const folderGlyph = '<svg class="presentation-folder-glyph" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"></path></svg>';
+    const pdfGlyph = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
+    try {
+        await loadVisitationPresentationLibrary(force);
+        const folders = visitationPresentationLibrary.folders || [];
+        const selected = folders.find(folder => folder.id === UserCenterFormState.presentationFolder) || folders[0];
+        UserCenterFormState.presentationFolder = selected?.id || '';
+        const files = (visitationPresentationLibrary.files || []).filter(file => file.folderId === selected?.id);
+        const folderHtml = folders.map(folder => {
+            const count = (visitationPresentationLibrary.files || []).filter(file => file.folderId === folder.id).length;
+            return `<button type="button" class="presentation-folder-item${folder.id === selected?.id ? ' active' : ''}" onclick="selectVisitationPresentationFolder('${userOffTakeEscape(folder.id)}')"><span class="presentation-folder-icon">${folderGlyph}</span><span class="presentation-folder-text"><strong>${userOffTakeEscape(folder.name)}</strong><small>${count} PDF${count === 1 ? '' : 's'}</small></span></button>`;
+        }).join('') || '<div class="presentation-folder-empty">No folders yet.</div>';
+        const fileHtml = files.length ? files.map(file => `<article class="presentation-pdf-card" ondblclick="openVisitationPresentationPdf('${userOffTakeEscape(file.id)}')"><div class="presentation-pdf-icon">${pdfGlyph}<span>PDF</span></div><div class="presentation-pdf-body"><h3 title="${userOffTakeEscape(file.name)}">${userOffTakeEscape(file.name)}</h3><dl><div><dt>Uploaded</dt><dd>${new Date(file.uploadedAt || Date.now()).toLocaleDateString('en-GB')}</dd></div><div><dt>Size</dt><dd>${file.size >= 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((file.size || 0) / 1024))} KB`}</dd></div></dl></div><div class="presentation-pdf-actions"><button type="button" class="btn-secondary presentation-pdf-view" onclick="event.stopPropagation();openVisitationPresentationPdf('${userOffTakeEscape(file.id)}')">Open</button><button type="button" class="btn-secondary presentation-pdf-download" onclick="event.stopPropagation();downloadVisitationPresentationPdf('${userOffTakeEscape(file.id)}')" title="Download PDF">&#8595;</button></div></article>`).join('') : '<div class="presentation-empty"><strong>No promotion PDFs in this folder.</strong><span>Files uploaded from OneAlchemy will appear here automatically.</span></div>';
+        const fileLabel = files.length ? `${files.length} file${files.length === 1 ? '' : 's'}` : 'Empty folder';
+        area.innerHTML = `<div class="presentation-library presentation-library--readonly"><aside class="presentation-folder-panel"><div class="presentation-panel-head"><div><span>Folders</span><strong>${folders.length}</strong></div></div><div class="presentation-folder-list">${folderHtml}</div></aside><section class="presentation-library-main"><div class="presentation-library-path">${folderGlyph}<span class="presentation-path-name">${userOffTakeEscape(selected?.name || 'Presentation Library')}</span><span class="presentation-path-count">${fileLabel}</span></div><div class="presentation-pdf-grid">${fileHtml}</div></section></div>`;
+    } catch (error) {
+        area.innerHTML = `<div class="cf-preview-error">${userOffTakeEscape(error.message)}</div>`;
+    }
 };
 
 // ============================================================
@@ -4504,20 +4803,46 @@ window.renderVisitationOffTakeExact = function () {
     VisitationOneAlchemyState.offTakePage = Math.min(VisitationOneAlchemyState.offTakePage, pages);
     const start = (VisitationOneAlchemyState.offTakePage - 1) * pageSize, visible = rows.slice(start, start + pageSize);
     document.getElementById('off-take-total-count').textContent = rows.length.toLocaleString('en-US');
-    body.innerHTML = visible.length ? visible.map(row => `<tr><td>${userOffTakeEscape(row.outlet_code)}</td><td><strong>${userOffTakeEscape(row.outlet_name || '-')}</strong></td><td>${userOffTakeEscape(row.outlet_group || '-')}</td><td>${userOffTakeEscape(row.current_team || '-')}</td><td>${userOffTakeEscape(row.current_bde || '-')}</td><td>${userOffTakeEscape(row.bde || '-')}</td><td>${userOffTakeEscape(row.area || '-')}</td><td>${userOffTakeEscape(row.wholesaler || '-')}</td><td>${userOffTakeEscape(row.sku_company || '-')}</td><td>${userOffTakeEscape(row.sku_code || '-')}</td><td>${userOffTakeEscape(row.principle || '-')}</td><td>${userOffTakeEscape(row.category || '-')}</td><td>${userOffTakeEscape(row.brand || '-')}</td><td>${userOffTakeEscape(row.product || '-')}</td><td>${userOffTakeEscape(row.size || '-')}</td><td>${userOffTakeEscape(row.packing || '-')}</td><td class="cf-td-number">${cfMoney(row.price_inc_vat)}</td><td class="cf-td-number">${cfMoney(row.price_exc_vat)}</td><td class="cf-td-number">${cfQty(row.vol_btls)}</td><td class="cf-td-number">${cfPercent(row.rebate_percent)}</td><td class="cf-td-number">${cfMoney(row.total_price_inc_vat)}</td><td class="cf-td-number">${cfMoney(row.total_price_exc_vat)}</td><td class="cf-td-number">${cfMoney(row.rebate_amount)}</td><td>${userOffTakeEscape(row.received_month || '-')}</td><td class="cf-td-number">${cfQty(row.liter)}</td><td class="col-actions">${isVisitationAdmin() ? `<button class="btn-icon" onclick="openVisitationOffTakeForm('${userOffTakeEscape(row.id)}')">✎</button><button class="btn-icon btn-delete" onclick="deleteVisitationOffTake('${userOffTakeEscape(row.id)}')">×</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="26" class="table-empty-cell">No off-take records found.</td></tr>';
+    // Update summary stats pills
+    const totalVol = rows.reduce((s, r) => s + cfNumber(r.vol_btls), 0);
+    const totalRebate = rows.reduce((s, r) => s + cfNumber(r.rebate_amount), 0);
+    const volEl = document.getElementById('off-take-vol-count');
+    const rebateEl = document.getElementById('off-take-rebate-count');
+    const volPill = document.getElementById('off-take-vol-pill');
+    const rebatePill = document.getElementById('off-take-rebate-pill');
+    if (volEl) volEl.textContent = totalVol.toLocaleString('en-US');
+    if (rebateEl) rebateEl.textContent = cfMoney(totalRebate);
+    if (volPill) volPill.style.display = rows.length ? '' : 'none';
+    if (rebatePill) rebatePill.style.display = rows.length ? '' : 'none';
+    body.innerHTML = visible.length ? visible.map(row => `<tr><td><span style="font-family:monospace;font-size:11px;color:var(--text-muted)">${userOffTakeEscape(row.outlet_code)}</span></td><td><strong>${userOffTakeEscape(row.outlet_name || '-')}</strong></td><td>${userOffTakeEscape(row.outlet_group || '-')}</td><td>${userOffTakeEscape(row.current_team || '-')}</td><td>${userOffTakeEscape(row.current_bde || '-')}</td><td>${userOffTakeEscape(row.bde || '-')}</td><td>${userOffTakeEscape(row.area || '-')}</td><td><span style="font-weight:700;color:var(--text-main)">${userOffTakeEscape(row.wholesaler || '-')}</span></td><td style="color:var(--text-muted);font-size:11px">${userOffTakeEscape(row.sku_company || '-')}</td><td><span style="font-family:monospace;font-size:11px">${userOffTakeEscape(row.sku_code || '-')}</span></td><td>${userOffTakeEscape(row.principle || '-')}</td><td>${userOffTakeEscape(row.category || '-')}</td><td>${userOffTakeEscape(row.brand || '-')}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${userOffTakeEscape(row.product || '-')}</td><td style="color:var(--text-muted)">${userOffTakeEscape(row.size || '-')}</td><td style="color:var(--text-muted)">${userOffTakeEscape(row.packing || '-')}</td><td class="cf-td-number">${cfMoney(row.price_inc_vat)}</td><td class="cf-td-number">${cfMoney(row.price_exc_vat)}</td><td class="cf-td-number" style="font-weight:700;color:var(--primary)">${cfQty(row.vol_btls)}</td><td class="cf-td-number">${cfPercent(row.rebate_percent)}</td><td class="cf-td-number">${cfMoney(row.total_price_inc_vat)}</td><td class="cf-td-number">${cfMoney(row.total_price_exc_vat)}</td><td class="cf-td-number" style="font-weight:700;color:#7c3aed">${cfMoney(row.rebate_amount)}</td><td style="color:var(--text-muted);font-size:11px">${userOffTakeEscape(row.received_month || '-')}</td><td class="cf-td-number" style="color:var(--text-muted)">${cfQty(row.liter)}</td><td class="col-actions">${isVisitationAdmin() ? `<button class="btn-icon" title="Edit" onclick="openVisitationOffTakeForm('${userOffTakeEscape(row.id)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-icon btn-delete" title="Delete" onclick="deleteVisitationOffTake('${userOffTakeEscape(row.id)}')"></button>` : ''}</td></tr>`).join('') : '<tr><td colspan="26" class="table-empty-cell">No off-take records found.</td></tr>';
     body.querySelectorAll('.col-actions .btn-icon:not(.btn-delete)').forEach(button => button.remove());
     body.querySelectorAll('.col-actions .btn-delete').forEach(button => {
         button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>';
         button.title = 'Delete';
     });
-    document.getElementById('off-take-info').textContent = `Showing ${visible.length ? start + 1 : 0}-${start + visible.length} of ${rows.length.toLocaleString('en-US')} off-take rows${isVisitationAdmin() ? '' : ' · your data only'}`;
-    document.getElementById('off-take-pagination').innerHTML = `<button class="btn-secondary" onclick="setVisitationOffTakePage(${VisitationOneAlchemyState.offTakePage - 1})" ${VisitationOneAlchemyState.offTakePage <= 1 ? 'disabled' : ''}>Previous</button><span style="margin:0 10px;">${VisitationOneAlchemyState.offTakePage} / ${pages}</span><button class="btn-secondary" onclick="setVisitationOffTakePage(${VisitationOneAlchemyState.offTakePage + 1})" ${VisitationOneAlchemyState.offTakePage >= pages ? 'disabled' : ''}>Next</button>`;
-    const active = ['off-take-search', 'off-take-year-filter', 'off-take-month-filter', 'off-take-wholesaler-filter', 'off-take-principle-filter', 'off-take-category-filter'].some(id => document.getElementById(id)?.value);
+    document.getElementById('off-take-info').textContent = `Showing ${visible.length ? start + 1 : 0}–${start + visible.length} of ${rows.length.toLocaleString('en-US')} rows${isVisitationAdmin() ? '' : ' · your data only'}`;
+    const prevDisabled = VisitationOneAlchemyState.offTakePage <= 1 ? 'disabled' : '';
+    const nextDisabled = VisitationOneAlchemyState.offTakePage >= pages ? 'disabled' : '';
+    document.getElementById('off-take-pagination').innerHTML = `<button class="btn-secondary" style="min-height:36px;padding:0 14px;border-radius:8px;font-size:13px;" onclick="setVisitationOffTakePage(${VisitationOneAlchemyState.offTakePage - 1})" ${prevDisabled}>← Prev</button><span style="font-size:12px;color:var(--text-muted);min-width:80px;text-align:center;">${VisitationOneAlchemyState.offTakePage} / ${pages}</span><button class="btn-secondary" style="min-height:36px;padding:0 14px;border-radius:8px;font-size:13px;" onclick="setVisitationOffTakePage(${VisitationOneAlchemyState.offTakePage + 1})" ${nextDisabled}>Next →</button>`;
+    const advancedFilterIds = ['off-take-year-filter', 'off-take-month-filter', 'off-take-wholesaler-filter', 'off-take-principle-filter', 'off-take-category-filter'];
+    const activeFilterCount = advancedFilterIds.filter(id => document.getElementById(id)?.value).length;
+    const active = Boolean(document.getElementById('off-take-search')?.value || activeFilterCount);
+    const filterBadge = document.getElementById('off-take-filter-badge');
+    if (filterBadge) { filterBadge.textContent = String(activeFilterCount); filterBadge.hidden = !activeFilterCount; }
     document.getElementById('off-take-filter-banner').style.display = active ? '' : 'none'; document.getElementById('off-take-filter-count').textContent = `${rows.length} matching rows`;
 };
 
 window.setVisitationOffTakePage = function (page) { VisitationOneAlchemyState.offTakePage = Math.max(1, page); renderVisitationOffTakeExact(); };
 window.clearVisitationOffTakeFilters = function () { ['off-take-search', 'off-take-year-filter', 'off-take-month-filter', 'off-take-wholesaler-filter', 'off-take-principle-filter', 'off-take-category-filter'].forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; }); VisitationOneAlchemyState.offTakePage = 1; renderVisitationOffTakeExact(); };
+
+window.toggleVisitationOffTakeFilters = function () {
+    const filters = document.getElementById('off-take-advanced-filters');
+    const button = document.getElementById('off-take-filter-toggle');
+    if (!filters || !button) return;
+    const open = !filters.classList.contains('open');
+    filters.classList.toggle('open', open);
+    button.setAttribute('aria-expanded', String(open));
+};
 
 window.openVisitationOffTakeForm = async function (id = '') {
     if (!isVisitationAdmin()) return;
@@ -4525,34 +4850,180 @@ window.openVisitationOffTakeForm = async function (id = '') {
     const row = VisitationOneAlchemyState.offTakeRows.find(item => String(item.id) === String(id)) || {};
     VisitationOneAlchemyState.offTakeEditId = id;
     document.getElementById('visitation-offtake-modal')?.remove();
-    const overlay = document.createElement('div'); overlay.id = 'visitation-offtake-modal'; overlay.className = 'modal-overlay active'; overlay.style.zIndex = '10000';
-    const outletOptions = UserOffTakeState.outlets.map(item => `<option value="${userOffTakeEscape(item.customer_id)}">${userOffTakeEscape(item.outlet_code || item.customer_id)} - ${userOffTakeEscape(item.outlet_name)}</option>`).join('');
-    const wholesalerOptions = UserOffTakeState.wholesalers.map(item => { const name = getUserWholesalerName(item); return `<option value="${userOffTakeEscape(name)}">${userOffTakeEscape(name)}</option>`; }).join('');
-    const productOptions = UserOffTakeState.products.map(item => { const code = getUserProductCode(item); return `<option value="${userOffTakeEscape(code)}">${userOffTakeEscape(code)} - ${userOffTakeEscape(item.product_name || item.name_for_express || code)}</option>`; }).join('');
-    overlay.innerHTML = `<div class="modal modal-wide off-take-modal"><div class="modal-header"><div><h2>${id ? 'Edit Off Take' : 'Add New Off Take'}</h2><p class="outlet-master-modal-subtitle">Select one or more wholesalers first, then choose products. Totals calculate automatically.</p></div><button class="btn-close" onclick="closeVisitationOffTakeForm()">×</button></div><form onsubmit="saveVisitationOffTakeForm(event)"><div class="modal-body outlet-master-form"><section class="outlet-master-card"><div class="outlet-master-card__header"><span class="outlet-master-card__num">1</span><span class="outlet-master-card__title">Outlet</span></div><div class="form-grid outlet-master-card__grid"><label class="form-group form-group--wide">Outlet<select id="vof-outlet" class="form-select" required>${outletOptions}</select></label></div></section><section class="outlet-master-card"><div class="outlet-master-card__header"><span class="outlet-master-card__num">2</span><span class="outlet-master-card__title">Wholesaler & Product</span></div><div class="form-grid outlet-master-card__grid"><label class="form-group form-group--wide">Wholesaler<select id="vof-wholesaler" class="form-select" multiple required onchange="renderVisitationOffTakeLineItems()">${wholesalerOptions}</select></label><label class="form-group form-group--wide">Products<select id="vof-products" class="form-select" multiple required onchange="renderVisitationOffTakeLineItems()">${productOptions}</select></label></div></section><section class="outlet-master-card"><div class="outlet-master-card__header"><span class="outlet-master-card__num">3</span><span class="outlet-master-card__title">Quantity</span></div><div class="form-grid outlet-master-card__grid"><label class="form-group">Received Month<input id="vof-month" class="form-input" type="month" required value="${userOffTakeEscape(getUserOffTakeMonthKey(row.received_month) || getUserOffTakeMonthValue())}"></label><div class="form-group form-group--wide"><div id="vof-line-items" class="off-take-line-items"></div></div></div></section></div><div class="modal-footer"><button class="btn-secondary" type="button" onclick="closeVisitationOffTakeForm()">Cancel</button><button class="btn-primary" type="submit">Save Off Take</button></div></form></div>`;
+    const overlay = document.createElement('div');
+    overlay.id = 'visitation-offtake-modal';
+    overlay.className = 'modal-overlay active';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'vof-title');
+    const customer = UserOffTakeState.outlets.find(item => item.outlet_code === row.outlet_code || item.customer_id === row.outlet_code);
+    const outletOptions = UserOffTakeState.outlets.map(item => `<option value="${userOffTakeEscape(item.customer_id)}">${userOffTakeEscape(item.outlet_name || 'Unnamed outlet')}</option>`).join('');
+    const selectedWholesaler = userOffTakeText(row.wholesaler);
+    const wholesalerNames = Array.from(new Set(UserOffTakeState.wholesalers.map(getUserWholesalerName).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const wholesalerOptions = wholesalerNames.map(name => `<option value="${userOffTakeEscape(name)}"${name === selectedWholesaler ? ' selected' : ''}>${userOffTakeEscape(name)}</option>`).join('');
+    overlay.innerHTML = `<div class="modal modal-wide off-take-modal">
+        <div class="modal-header">
+            <div><h2 id="vof-title">${id ? 'Edit Off Take' : 'Add New Off Take'}</h2><p class="outlet-master-modal-subtitle">Select one or more wholesalers first, then choose products inside each wholesaler card. Totals calculate automatically.</p></div>
+            <button class="btn-close" type="button" onclick="closeVisitationOffTakeForm()" aria-label="Close">×</button>
+        </div>
+        <form id="vof-form" onsubmit="saveVisitationOffTakeForm(event)">
+            <div class="modal-body outlet-master-form">
+                <section class="outlet-master-card vof-section">
+                    <div class="outlet-master-card__header"><span class="outlet-master-card__num">1</span><span class="outlet-master-card__title">Outlet</span></div>
+                    <div class="form-grid outlet-master-card__grid vof-outlet-grid">
+                        <div class="form-group form-group--wide"><label class="form-label" for="vof-outlet">Outlet <span class="req">*</span></label><select id="vof-outlet" class="form-select" required onchange="populateVisitationOffTakeOutletDetails()"><option value="">-- Select outlet --</option>${outletOptions}</select></div>
+                        <div class="form-group"><label class="form-label" for="vof-code">Code</label><input id="vof-code" class="form-input off-take-readonly" readonly></div>
+                        <div class="form-group"><label class="form-label" for="vof-outlet-name">Outlet Name</label><input id="vof-outlet-name" class="form-input off-take-readonly" readonly></div>
+                        <div class="form-group"><label class="form-label" for="vof-group">Group</label><input id="vof-group" class="form-input off-take-readonly" readonly></div>
+                        <div class="form-group"><label class="form-label" for="vof-current-team">Current Team</label><input id="vof-current-team" class="form-input off-take-readonly" readonly></div>
+                        <div class="form-group"><label class="form-label" for="vof-current-bde">Current BDE</label><input id="vof-current-bde" class="form-input off-take-readonly" readonly></div>
+                        <div class="form-group"><label class="form-label" for="vof-bde">BDE</label><input id="vof-bde" class="form-input off-take-readonly" readonly></div>
+                        <div class="form-group"><label class="form-label" for="vof-area">Area</label><input id="vof-area" class="form-input off-take-readonly" readonly></div>
+                    </div>
+                </section>
+                <section class="outlet-master-card vof-section">
+                    <div class="outlet-master-card__header"><span class="outlet-master-card__num">2</span><span class="outlet-master-card__title">Wholesaler</span></div>
+                    <div class="form-grid outlet-master-card__grid"><div class="form-group form-group--wide"><label class="form-label" for="vof-wholesaler">Wholesaler <span class="req">*</span></label><select id="vof-wholesaler" class="form-select" multiple>${wholesalerOptions}</select></div></div>
+                </section>
+                <section class="outlet-master-card vof-section vof-period-section">
+                    <div class="outlet-master-card__header"><span class="outlet-master-card__num">3</span><span class="outlet-master-card__title">Quantity</span></div>
+                    <div class="form-grid outlet-master-card__grid"><div class="form-group"><label class="form-label" for="vof-month">Received Month <span class="req">*</span></label><input id="vof-month" class="form-input" type="month" required value="${userOffTakeEscape(getUserOffTakeMonthKey(row.received_month) || getUserOffTakeMonthValue())}"></div></div>
+                    <div class="vof-section-label">Enter Price and Volume Per Product <span class="req">*</span></div>
+                    <div id="vof-wholesaler-cards" class="vof-wholesaler-cards"></div>
+                </section>
+            </div>
+            <div class="modal-footer"><button class="btn-secondary" type="button" onclick="closeVisitationOffTakeForm()">Cancel</button><button id="vof-save" class="btn-primary" type="submit">Save Off Take</button></div>
+        </form>
+    </div>`;
     document.body.appendChild(overlay);
-    const customer = UserOffTakeState.outlets.find(item => item.outlet_code === row.outlet_code || item.customer_id === row.outlet_code); if (customer) document.getElementById('vof-outlet').value = customer.customer_id;
-    if (row.wholesaler) Array.from(document.getElementById('vof-wholesaler').options).forEach(option => option.selected = option.value === row.wholesaler);
-    if (row.sku_code) Array.from(document.getElementById('vof-products').options).forEach(option => option.selected = option.value === row.sku_code);
-    renderVisitationOffTakeLineItems(row);
+    document.body.classList.add('modal-open');
+    if (window.TomSelect) {
+        visitationOffTakeOutletSelect = new TomSelect('#vof-outlet', {
+            maxItems: 1, create: false,
+            placeholder: '-- Search outlet --',
+            onChange: () => populateVisitationOffTakeOutletDetails()
+        });
+        visitationOffTakeWholesalerSelect = new TomSelect('#vof-wholesaler', {
+            plugins: ['remove_button'], maxItems: null, create: false,
+            placeholder: 'Search and select one or more Wholesalers...',
+            onChange: () => renderVisitationOffTakeWholesalerCards()
+        });
+    }
+    if (customer) {
+        if (visitationOffTakeOutletSelect) visitationOffTakeOutletSelect.setValue(customer.customer_id, true);
+        else document.getElementById('vof-outlet').value = customer.customer_id;
+    }
+    populateVisitationOffTakeOutletDetails();
+    renderVisitationOffTakeWholesalerCards(row);
+    overlay.addEventListener('click', event => { if (event.target === overlay) closeVisitationOffTakeForm(); });
+    overlay.addEventListener('keydown', event => { if (event.key === 'Escape') closeVisitationOffTakeForm(); });
+    document.getElementById('vof-outlet')?.focus();
 };
 
-window.renderVisitationOffTakeLineItems = function (seed = {}) {
-    const wholesalers = Array.from(document.getElementById('vof-wholesaler')?.selectedOptions || []).map(option => option.value);
-    const products = Array.from(document.getElementById('vof-products')?.selectedOptions || []).map(option => option.value);
-    const container = document.getElementById('vof-line-items'); if (!container) return;
-    container.innerHTML = wholesalers.length && products.length ? `<div class="off-take-line-list">${wholesalers.flatMap(wholesaler => products.map(code => { const product = UserOffTakeState.products.find(item => getUserProductCode(item) === code) || {}; return `<article class="off-take-line-card" data-wholesaler="${userOffTakeEscape(wholesaler)}" data-code="${userOffTakeEscape(code)}"><div class="off-take-line-product"><strong>${userOffTakeEscape(product.product_name || product.name_for_express || code)}</strong><span>${userOffTakeEscape(wholesaler)}</span></div><div class="off-take-line-entry"><label>Price Inc.VAT<input class="form-input" data-field="inc" type="number" step="0.01" value="${seed.sku_code === code ? userOffTakeEscape(seed.price_inc_vat || '') : ''}" required></label><label>Price Ex.VAT<input class="form-input" data-field="exc" type="number" step="0.01" value="${seed.sku_code === code ? userOffTakeEscape(seed.price_exc_vat || '') : ''}" required></label><label>Vol. Btls.<input class="form-input" data-field="vol" type="number" min="0" step="1" value="${seed.sku_code === code ? userOffTakeEscape(seed.vol_btls || '') : ''}" required></label><label>Rebate (%)<input class="form-input" data-field="rebate" type="number" min="0" step="0.01" value="${seed.sku_code === code ? userOffTakeEscape(seed.rebate_percent ?? 25) : '25'}" required></label></div></article>`; })).join('')}</div>` : '<div class="off-take-line-empty">Select wholesalers and products to enter price and volume.</div>';
+window.populateVisitationOffTakeOutletDetails = function () {
+    const customer = UserOffTakeState.outlets.find(item => String(item.customer_id) === document.getElementById('vof-outlet')?.value) || {};
+    const values = {
+        'vof-code': customer.outlet_code || customer.customer_id || '',
+        'vof-outlet-name': customer.outlet_name || '',
+        'vof-group': customer.group_name || customer.group_code || '',
+        'vof-current-team': customer.team || '',
+        'vof-current-bde': customer.bde || '',
+        'vof-bde': AppState.userProfile.name || '',
+        'vof-area': customer.area_by_bde || customer.province || customer.region || ''
+    };
+    Object.entries(values).forEach(([id, value]) => { const input = document.getElementById(id); if (input) input.value = value; });
 };
 
-window.closeVisitationOffTakeForm = function () { document.getElementById('visitation-offtake-modal')?.remove(); };
+function collectVisitationOffTakeLineValues() {
+    const values = {};
+    document.querySelectorAll('#vof-wholesaler-cards .off-take-line-card').forEach(card => {
+        values[`${card.dataset.wholesaler}\n${card.dataset.code}`] = {
+            inc: card.querySelector('[data-field="inc"]')?.value || '',
+            exc: card.querySelector('[data-field="exc"]')?.value || '',
+            vol: card.querySelector('[data-field="vol"]')?.value || '',
+            rebate: card.querySelector('[data-field="rebate"]')?.value || '25'
+        };
+    });
+    return values;
+}
+
+function buildVisitationOffTakeLineCard(wholesaler, code, values = {}) {
+    const product = UserOffTakeState.products.find(item => getUserProductCode(item) === code) || {};
+    return `<article class="off-take-line-card" data-wholesaler="${userOffTakeEscape(wholesaler)}" data-code="${userOffTakeEscape(code)}">
+        <div class="off-take-line-product"><div><strong>${userOffTakeEscape(product.product_name || product.name_for_express || code)}</strong><span>${userOffTakeEscape(code)}</span></div><button type="button" class="vof-remove-line" onclick="removeVisitationOffTakeProduct(this)" aria-label="Remove product">×</button></div>
+        <div class="off-take-line-entry">
+            <label>Price Inc.VAT<input class="form-input" data-field="inc" inputmode="decimal" type="number" min="0" step="0.01" value="${userOffTakeEscape(values.inc ?? values.price_inc_vat ?? '')}" oninput="calculateVisitationOffTakeLine(this.closest('.off-take-line-card'))" required></label>
+            <label>Price Ex.VAT<input class="form-input" data-field="exc" inputmode="decimal" type="number" min="0" step="0.01" value="${userOffTakeEscape(values.exc ?? values.price_exc_vat ?? '')}" oninput="calculateVisitationOffTakeLine(this.closest('.off-take-line-card'))" required></label>
+            <label>Vol. Btls.<input class="form-input" data-field="vol" inputmode="numeric" type="number" min="0" step="1" value="${userOffTakeEscape(values.vol ?? values.vol_btls ?? '')}" oninput="calculateVisitationOffTakeLine(this.closest('.off-take-line-card'))" required></label>
+            <label>Rebate (%)<input class="form-input" data-field="rebate" inputmode="decimal" type="number" min="0" max="100" step="0.01" value="${userOffTakeEscape(values.rebate ?? values.rebate_percent ?? 25)}" oninput="calculateVisitationOffTakeLine(this.closest('.off-take-line-card'))" required></label>
+        </div>
+        <div class="vof-line-totals"><span>Total Inc.VAT <strong data-total="inc">0.00</strong></span><span>Total Ex.VAT <strong data-total="exc">0.00</strong></span><span>Rebate <strong data-total="rebate">0.00</strong></span></div>
+    </article>`;
+}
+
+window.renderVisitationOffTakeWholesalerCards = function (seed = {}) {
+    const container = document.getElementById('vof-wholesaler-cards');
+    if (!container) return;
+    const existing = collectVisitationOffTakeLineValues();
+    const rawSelected = visitationOffTakeWholesalerSelect?.getValue() ?? Array.from(document.getElementById('vof-wholesaler')?.selectedOptions || []).map(option => option.value);
+    const selected = Array.isArray(rawSelected) ? rawSelected : (rawSelected ? [rawSelected] : []);
+    const productOptions = UserOffTakeState.products.map(item => {
+        const code = getUserProductCode(item), name = item.product_name || item.name_for_express || code;
+        return `<option value="${userOffTakeEscape(code)}">${userOffTakeEscape(name)}</option>`;
+    }).join('');
+    container.innerHTML = selected.length ? selected.map(wholesaler => {
+        const lines = Object.entries(existing).filter(([key]) => key.startsWith(`${wholesaler}\n`)).map(([key, values]) => buildVisitationOffTakeLineCard(wholesaler, key.split('\n')[1], values)).join('');
+        return `<article class="vof-wholesaler-card" data-wholesaler="${userOffTakeEscape(wholesaler)}"><div class="vof-wholesaler-head"><div><span>Wholesaler</span><strong>${userOffTakeEscape(wholesaler)}</strong></div><span class="vof-product-count">${lines ? 'Selected products' : 'No products yet'}</span></div><div class="vof-product-adder"><select class="form-select vof-product-select"><option value="">-- Select product --</option>${productOptions}</select><button type="button" class="btn-secondary" onclick="addVisitationOffTakeProduct(this)">＋ Add Product</button></div><div class="off-take-line-list">${lines || '<div class="off-take-line-empty">Choose a product above, then tap Add Product.</div>'}</div></article>`;
+    }).join('') : '<div class="off-take-line-empty">Select at least one wholesaler to continue.</div>';
+    if (seed.wholesaler && seed.sku_code) {
+        const card = Array.from(container.querySelectorAll('.vof-wholesaler-card')).find(item => item.dataset.wholesaler === seed.wholesaler);
+        const alreadyAdded = card && Array.from(card.querySelectorAll('.off-take-line-card')).some(line => line.dataset.code === String(seed.sku_code));
+        if (card && !alreadyAdded) {
+            const list = card.querySelector('.off-take-line-list');
+            list.innerHTML = buildVisitationOffTakeLineCard(seed.wholesaler, seed.sku_code, seed);
+        }
+    }
+    container.querySelectorAll('.off-take-line-card').forEach(calculateVisitationOffTakeLine);
+};
+
+window.renderVisitationOffTakeLineItems = window.renderVisitationOffTakeWholesalerCards;
+
+window.addVisitationOffTakeProduct = function (button) {
+    const card = button.closest('.vof-wholesaler-card'), select = card?.querySelector('.vof-product-select');
+    const code = select?.value, wholesaler = card?.dataset.wholesaler;
+    if (!card || !code || !wholesaler) return toast('Select a product first.', false);
+    if (Array.from(card.querySelectorAll('.off-take-line-card')).some(line => line.dataset.code === code)) return toast('This product is already selected.', false);
+    const list = card.querySelector('.off-take-line-list');
+    if (list.querySelector('.off-take-line-empty')) list.innerHTML = '';
+    list.insertAdjacentHTML('beforeend', buildVisitationOffTakeLineCard(wholesaler, code));
+    calculateVisitationOffTakeLine(list.querySelector('.off-take-line-card:last-child'));
+    select.value = '';
+};
+
+window.removeVisitationOffTakeProduct = function (button) {
+    const list = button.closest('.off-take-line-list');
+    button.closest('.off-take-line-card')?.remove();
+    if (list && !list.querySelector('.off-take-line-card')) list.innerHTML = '<div class="off-take-line-empty">Choose a product above, then tap Add Product.</div>';
+};
+
+window.calculateVisitationOffTakeLine = function (card) {
+    if (!card) return;
+    const inc = cfNumber(card.querySelector('[data-field="inc"]')?.value), exc = cfNumber(card.querySelector('[data-field="exc"]')?.value), vol = cfNumber(card.querySelector('[data-field="vol"]')?.value), rebate = cfNumber(card.querySelector('[data-field="rebate"]')?.value);
+    const totals = { inc: inc * vol, exc: exc * vol, rebate: exc * vol * rebate / 100 };
+    Object.entries(totals).forEach(([key, value]) => { const element = card.querySelector(`[data-total="${key}"]`); if (element) element.textContent = userOffTakeMoney(value); });
+};
+
+window.closeVisitationOffTakeForm = function () { visitationOffTakeOutletSelect?.destroy(); visitationOffTakeOutletSelect = null; visitationOffTakeWholesalerSelect?.destroy(); visitationOffTakeWholesalerSelect = null; document.getElementById('visitation-offtake-modal')?.remove(); document.body.classList.remove('modal-open'); };
 
 window.saveVisitationOffTakeForm = async function (event) {
     event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
     const customer = UserOffTakeState.outlets.find(item => String(item.customer_id) === document.getElementById('vof-outlet').value); if (!customer) return;
-    const cards = Array.from(document.querySelectorAll('#vof-line-items .off-take-line-card'));
+    const cards = Array.from(document.querySelectorAll('#vof-wholesaler-cards .off-take-line-card'));
     const payloads = cards.map(card => { const code = card.dataset.code, product = UserOffTakeState.products.find(item => getUserProductCode(item) === code) || {}, inc = cfNumber(card.querySelector('[data-field=inc]').value), exc = cfNumber(card.querySelector('[data-field=exc]').value), vol = cfNumber(card.querySelector('[data-field=vol]').value), rebate = cfNumber(card.querySelector('[data-field=rebate]').value); return { outlet_code: customer.outlet_code || customer.customer_id, outlet_name: customer.outlet_name || null, outlet_group: customer.group_name || customer.group_code || null, current_team: customer.team || null, current_bde: customer.bde || null, bde: AppState.userProfile.name || null, area: customer.area_by_bde || customer.province || customer.region || null, wholesaler: card.dataset.wholesaler, sku_company: product.company_name || null, sku_code: code, principle: product.brand_owner_principle || null, category: product.category || null, brand: product.brand || null, product: product.product_name || product.name_for_express || code, size: product.size || null, packing: product.pack || null, price_inc_vat: inc, price_exc_vat: exc, vol_btls: vol, rebate_percent: rebate, total_price_inc_vat: inc * vol, total_price_exc_vat: exc * vol, direct_price_exc_vat: exc, total_direct_price_exc_vat: exc * vol, rebate_amount: exc * vol * rebate / 100, received_month: formatUserOffTakeMonth(document.getElementById('vof-month').value), liter: parseUserProductSizeLiters(product.size) * vol, source_file: 'web:visitation-off-take', updated_at: new Date().toISOString() }; });
     if (!payloads.length) return toast('Select wholesaler and product.', false);
-    try { if (VisitationOneAlchemyState.offTakeEditId && payloads.length === 1) await DB.update('off_take', `id=eq.${encodeURIComponent(VisitationOneAlchemyState.offTakeEditId)}`, payloads[0]); else await DB.insert('off_take', payloads); closeVisitationOffTakeForm(); VisitationOneAlchemyState.offTakeLoaded = false; await loadVisitationOffTakeExact(true); toast('Off Take saved successfully.'); } catch (error) { toast('Save failed: ' + error.message, false); }
+    const saveButton = document.getElementById('vof-save');
+    try { if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Saving...'; } if (VisitationOneAlchemyState.offTakeEditId && payloads.length === 1) await DB.update('off_take', `id=eq.${encodeURIComponent(VisitationOneAlchemyState.offTakeEditId)}`, payloads[0]); else await DB.insert('off_take', payloads); closeVisitationOffTakeForm(); VisitationOneAlchemyState.offTakeLoaded = false; await loadVisitationOffTakeExact(true); toast('Off Take saved successfully.'); } catch (error) { toast('Save failed: ' + error.message, false); } finally { if (saveButton) { saveButton.disabled = false; saveButton.textContent = 'Save Off Take'; } }
 };
 
 window.deleteVisitationOffTake = async function (id) { if (!isVisitationAdmin() || !confirm('Delete this Off Take row?')) return; try { await DB.delete('off_take', `id=eq.${encodeURIComponent(id)}`); VisitationOneAlchemyState.offTakeLoaded = false; await loadVisitationOffTakeExact(true); toast('Off Take deleted.'); } catch (error) { toast('Delete failed: ' + error.message, false); } };
