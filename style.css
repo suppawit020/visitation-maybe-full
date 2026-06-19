@@ -86,7 +86,10 @@ body {
     min-height: 100dvh;
     color: var(--text-main);
     line-height: 1.5;
-    overscroll-behavior: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-x: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* =========================================
@@ -340,7 +343,7 @@ body.sidebar-drawer-open {
 #tab-outlet-master .outlet-master-toolbar,
 #tab-offtake .off-take-toolbar {
     display: grid !important;
-    align-items: end !important;
+    align-items: center !important;
     gap: 12px !important;
     margin-bottom: 20px;
 }
@@ -350,7 +353,28 @@ body.sidebar-drawer-open {
 }
 
 #tab-offtake .off-take-toolbar {
-    grid-template-columns: minmax(280px, 2.2fr) repeat(2, minmax(110px, .8fr)) minmax(170px, 1.2fr) repeat(2, minmax(125px, .9fr)) auto;
+    grid-template-columns: minmax(280px, 1fr) auto auto;
+}
+
+.off-take-filter-toggle {
+    display: none;
+}
+
+.off-take-filter-toggle span {
+    min-width: 22px;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+}
+
+.off-take-advanced-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(110px, .8fr)) minmax(170px, 1.2fr) repeat(2, minmax(125px, .9fr));
+    gap: 12px;
+    min-width: 0;
 }
 
 #tab-outlet-master .data-page-summary,
@@ -426,6 +450,39 @@ body.sidebar-drawer-open {
     min-height: 90px;
     padding: 10px 14px;
     border-radius: 22px;
+}
+
+/* Outlet Master status — tidy single-line rows on mobile (was a messy tall stack) */
+@media (max-width: 900px) {
+    #tab-outlet-master .status-pills {
+        grid-template-columns: 1fr;
+        gap: 0;
+        min-height: 0;
+        padding: 4px 8px;
+    }
+
+    #tab-outlet-master .status-pill {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "dot label count";
+        align-items: center;
+        column-gap: 10px;
+        min-height: 46px;
+        padding: 10px 10px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    #tab-outlet-master .status-pill:last-child {
+        border-bottom: 0;
+    }
+
+    #tab-outlet-master .status-pill__count {
+        justify-self: end;
+        font-size: 22px;
+    }
+
+    #tab-outlet-master .status-pill__label {
+        white-space: nowrap;
+    }
 }
 
 #tab-outlet-master .search-input,
@@ -511,6 +568,11 @@ body.sidebar-drawer-open {
     #tab-offtake .search-wrap {
         grid-column: span 2;
     }
+
+    #tab-offtake .off-take-advanced-filters {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 760px) {
@@ -527,6 +589,22 @@ body.sidebar-drawer-open {
     #tab-outlet-master .search-wrap,
     #tab-offtake .search-wrap {
         grid-column: 1 / -1;
+    }
+
+    #tab-offtake .off-take-filter-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #tab-offtake .off-take-advanced-filters {
+        display: none;
+        grid-column: 1 / -1;
+        grid-template-columns: 1fr;
+    }
+
+    #tab-offtake .off-take-advanced-filters.open {
+        display: grid;
     }
 }
 
@@ -3486,5 +3564,1936 @@ body.dark-mode .fc-list-table td {
 @media (max-width: 480px) {
     .toast {
         bottom: max(20px, env(safe-area-inset-bottom)) !important;
+    }
+}
+
+/* =========================================
+   OneAlchemy modal + touch responsive forms
+   ========================================= */
+body.modal-open {
+    overflow: hidden !important;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.42);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    overscroll-behavior: contain;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-overlay .modal {
+    width: min(1224px, calc(100vw - 48px));
+    max-height: min(824px, calc(100dvh - 48px));
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    background: var(--card-bg);
+    color: var(--text-main);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.modal-overlay .modal > form {
+    min-height: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.modal-overlay .modal-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 26px 32px 22px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--card-bg);
+}
+
+.modal-overlay .modal-header h2 {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.outlet-master-modal-subtitle {
+    margin: 7px 0 0;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.modal-overlay .btn-close {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: -8px -10px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.modal-overlay .btn-close:hover {
+    background: var(--bg-color);
+    color: var(--text-main);
+}
+
+.modal-overlay .modal-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 18px 32px 28px;
+    background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg));
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+.modal-overlay .modal-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 18px 32px max(18px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border-light);
+    background: var(--card-bg);
+    box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.modal-overlay .modal-footer .btn-primary,
+.modal-overlay .modal-footer .btn-secondary {
+    min-width: 124px;
+    min-height: 48px;
+}
+
+.form-group--wide {
+    grid-column: 1 / -1;
+}
+
+#visitation-offtake-modal .off-take-modal {
+    width: min(1224px, calc(100vw - 48px));
+    max-width: 1224px;
+    overflow: hidden;
+}
+
+/* The <form> wraps body + footer — make it a flex column that fills the
+   modal so the body scrolls internally instead of overflowing the shell. */
+#visitation-offtake-modal #vof-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#visitation-offtake-modal .off-take-modal .modal-body {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.vof-section {
+    margin: 0 0 18px;
+    padding: 22px;
+    border: 1px solid #dbe3ed;
+    border-radius: 10px;
+    background: var(--card-bg);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.vof-section:last-child {
+    margin-bottom: 0;
+}
+
+.vof-outlet-select {
+    margin-bottom: 18px;
+}
+
+.vof-outlet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 22px;
+}
+
+.vof-outlet-grid .form-input[readonly] {
+    background: #edf2f7;
+    color: #475569;
+    cursor: default;
+}
+
+.vof-section-label {
+    margin-bottom: 8px;
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.vof-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 164px;
+    overflow-y: auto;
+    padding: 3px 4px 10px 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+.vof-wholesaler-search {
+    margin-bottom: 10px;
+}
+
+.vof-choice {
+    min-width: 0;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    background: var(--card-bg);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.vof-choice:has(input:checked) {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.vof-choice input {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    accent-color: var(--primary);
+}
+
+.vof-choice span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vof-wholesaler-cards {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.vof-wholesaler-card {
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg-color) 62%, var(--card-bg));
+}
+
+.vof-wholesaler-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--card-bg);
+}
+
+.vof-wholesaler-head div {
+    display: grid;
+    gap: 2px;
+}
+
+.vof-wholesaler-head span {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.vof-wholesaler-head strong {
+    font-size: 15px;
+}
+
+.vof-product-adder {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 14px 16px;
+}
+
+.vof-product-adder .btn-secondary {
+    min-height: 46px;
+    white-space: nowrap;
+}
+
+.off-take-line-list {
+    display: grid;
+    gap: 10px;
+    padding: 0 16px 16px;
+}
+
+.off-take-line-card {
+    padding: 14px;
+    border: 1px solid #dbe3ed;
+    border-radius: 8px;
+    background: var(--card-bg);
+}
+
+.off-take-line-product {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.off-take-line-product div {
+    display: grid;
+    gap: 2px;
+}
+
+.off-take-line-product strong {
+    color: var(--text-main);
+    font-size: 14px;
+}
+
+.off-take-line-product span {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.vof-remove-line {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border: 0;
+    border-radius: 8px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 22px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.off-take-line-entry {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.off-take-line-entry label {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.vof-line-totals {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.vof-line-totals span {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    background: var(--bg-color);
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.vof-line-totals strong {
+    color: var(--primary);
+    font-size: 12px;
+}
+
+.off-take-line-empty {
+    padding: 16px;
+    border-radius: 8px;
+    background: var(--bg-color);
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.vof-period-section .form-group {
+    max-width: 360px;
+}
+
+@media (max-width: 1024px) {
+    .modal-overlay {
+        padding: 16px;
+    }
+
+    .modal-overlay .modal,
+    #visitation-offtake-modal .off-take-modal {
+        width: calc(100vw - 32px);
+        max-height: calc(100dvh - 32px);
+    }
+
+    .modal-overlay .modal-header,
+    .modal-overlay .modal-footer {
+        padding-left: 22px;
+        padding-right: 22px;
+    }
+
+    .modal-overlay .modal-body {
+        padding-left: 22px;
+        padding-right: 22px;
+    }
+
+    .vof-choice-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .off-take-line-entry {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .modal-overlay {
+        align-items: stretch;
+        padding: 0;
+    }
+
+    .modal-overlay .modal,
+    #visitation-offtake-modal .off-take-modal {
+        width: 100vw;
+        max-width: none;
+        max-height: 100dvh;
+        height: 100dvh;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .modal-overlay .modal-header {
+        padding: max(16px, env(safe-area-inset-top)) 16px 14px;
+    }
+
+    .modal-overlay .modal-header h2 {
+        font-size: 20px;
+    }
+
+    .outlet-master-modal-subtitle {
+        font-size: 12px;
+    }
+
+    .modal-overlay .modal-body {
+        padding: 12px 12px 20px;
+    }
+
+    .modal-overlay .modal-footer {
+        padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    }
+
+    .modal-overlay .modal-footer .btn-primary,
+    .modal-overlay .modal-footer .btn-secondary {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .vof-section {
+        margin-bottom: 12px;
+        padding: 16px;
+    }
+
+    .vof-outlet-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .vof-choice-grid {
+        grid-template-columns: 1fr;
+        max-height: 190px;
+    }
+
+    .vof-product-adder {
+        grid-template-columns: 1fr;
+        padding: 12px;
+    }
+
+    .off-take-line-list {
+        padding: 0 12px 12px;
+    }
+
+    .off-take-line-entry,
+    .vof-line-totals {
+        grid-template-columns: 1fr;
+    }
+
+    .vof-wholesaler-head {
+        align-items: flex-start;
+        padding: 12px;
+    }
+
+    .vof-period-section .form-group {
+        max-width: none;
+    }
+
+    #tab-outlet-master .outlet-master-toolbar,
+    #tab-offtake .off-take-toolbar {
+        grid-template-columns: 1fr !important;
+    }
+
+    #tab-outlet-master .outlet-master-toolbar > *,
+    #tab-offtake .off-take-toolbar > * {
+        width: 100%;
+        min-width: 0;
+    }
+
+    #tab-outlet-master .table-footer,
+    #tab-offtake .table-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 380px) {
+    .modal-overlay .modal-header {
+        gap: 8px;
+    }
+
+    .outlet-master-modal-subtitle {
+        display: none;
+    }
+
+    .modal-overlay .modal-footer {
+        gap: 8px;
+    }
+
+    .modal-overlay .modal-footer .btn-primary,
+    .modal-overlay .modal-footer .btn-secondary {
+        padding-left: 10px;
+        padding-right: 10px;
+        font-size: 13px;
+    }
+}
+
+body.dark-mode .vof-outlet-grid .form-input[readonly] {
+    background: #172033;
+    color: var(--text-muted);
+}
+
+body.dark-mode .vof-section,
+body.dark-mode .vof-wholesaler-card,
+body.dark-mode .off-take-line-card {
+    border-color: var(--border-light);
+}
+
+html {
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+body:not(.modal-open):not(.sidebar-drawer-open) {
+    overflow-y: auto !important;
+    touch-action: pan-y;
+}
+
+.app-layout,
+.app-main {
+    min-height: 100dvh;
+}
+
+.presentation-library--readonly .presentation-folder-item {
+    cursor: pointer;
+}
+
+.presentation-library--readonly .presentation-pdf-actions .btn-secondary {
+    min-width: 96px;
+}
+
+#tab-offtake .off-take-filter-toggle {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    #tab-offtake .off-take-toolbar {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+    }
+
+    #tab-offtake .off-take-toolbar .search-wrap {
+        grid-column: 1 / -1;
+    }
+
+    #tab-offtake .off-take-filter-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #tab-offtake .off-take-advanced-filters {
+        display: none;
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #tab-offtake .off-take-advanced-filters.open {
+        display: grid;
+    }
+}
+
+@media (max-width: 560px) {
+    #tab-offtake .off-take-toolbar,
+    #tab-offtake .off-take-advanced-filters {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ============================================================
+   OFF TAKE PAGE — UX ENHANCEMENT PATCH (v2026-06-19)
+   Covers: page layout, stats bar, toolbar, table,
+           modal form, wholesaler cards, product line cards,
+           all other modals/forms (outlet master, confirm, detail)
+   Mobile-first, works on PC too.
+   ============================================================ */
+
+/* ── Page-level padding & scroll ─────────────────────────── */
+#tab-offtake {
+    padding-bottom: 40px;
+}
+
+/* ── Summary bar: improved pill stats ─────────────────────── */
+#tab-offtake .data-page-summary {
+    width: max-content;
+    max-width: 100%;
+    margin-bottom: 20px;
+}
+
+#tab-offtake .status-pills {
+    display: flex;
+    gap: 0;
+    border-radius: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    padding: 0;
+    min-height: unset;
+    overflow: hidden;
+}
+
+#tab-offtake .status-pill {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 14px 22px;
+    border-right: 1px solid var(--border-light);
+}
+
+#tab-offtake .status-pill:last-child {
+    border-right: none;
+}
+
+#tab-offtake .status-pill__label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+#tab-offtake .status-pill__count {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.1;
+    letter-spacing: -1px;
+}
+
+#tab-offtake .status-pill--total .status-pill__count {
+    color: var(--primary);
+}
+
+/* ── Toolbar: search + filter toggle row ─────────────────── */
+#tab-offtake .page-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+#tab-offtake .page-heading > div {
+    min-width: 0;
+}
+
+#tab-offtake .page-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    color: var(--text-main);
+    line-height: 1.1;
+}
+
+#tab-offtake .page-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Toolbar grid tweaks already handled above – just improve action row */
+#tab-offtake .off-take-toolbar .btn-primary {
+    white-space: nowrap;
+    min-height: 46px;
+    padding: 0 20px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    border-radius: 12px;
+    box-shadow: var(--shadow-red);
+    transition: background var(--t-fast), transform 0.15s, box-shadow 0.15s;
+}
+
+#tab-offtake .off-take-toolbar .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(196,30,36,0.4);
+}
+
+#tab-offtake .off-take-toolbar .btn-primary:active {
+    transform: scale(0.98);
+}
+
+/* Filter toggle pill style */
+#tab-offtake .off-take-filter-toggle {
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 12px;
+    padding: 0 16px;
+    min-height: 46px;
+    border: 1.5px solid var(--border-light);
+    background: var(--card-bg);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+#tab-offtake .off-take-filter-toggle:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(196,30,36,0.04);
+}
+
+#tab-offtake .off-take-filter-toggle[aria-expanded="true"] {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(196,30,36,0.06);
+}
+
+/* Advanced filter row: nice rounded selects */
+#tab-offtake .off-take-advanced-filters {
+    padding: 4px 0 8px;
+}
+
+#tab-offtake .off-take-advanced-filters .filter-select {
+    border-radius: 10px;
+    min-height: 46px;
+    font-size: 13px;
+}
+
+/* ── Quick filter banner ─────────────────────────────────── */
+#tab-offtake .quick-filter-banner {
+    background: linear-gradient(135deg, rgba(196,30,36,0.05), rgba(196,30,36,0.02));
+    border: 1px solid rgba(196,30,36,0.18);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+}
+
+/* ── Table card shell ────────────────────────────────────── */
+#tab-offtake .table-card {
+    border-radius: 16px;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+#tab-offtake .off-take-table-wrap {
+    max-height: 62vh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Table header: cleaner look */
+#tab-offtake .off-take-table th {
+    background: #1f2937;
+    color: #f9fafb;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 12px 10px;
+    white-space: nowrap;
+    text-align: left;
+    border-bottom: 0;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+/* Numeric columns right-align in header */
+#tab-offtake .off-take-table th:nth-child(n+17):nth-child(-n+23),
+#tab-offtake .off-take-table th:nth-child(25),
+#tab-offtake .off-take-table th:nth-child(19) {
+    text-align: right;
+}
+
+/* Table rows */
+#tab-offtake .off-take-table td {
+    padding: 10px 10px;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: middle;
+    white-space: nowrap;
+    color: var(--text-main);
+    height: auto;
+    min-height: 52px;
+}
+
+#tab-offtake .off-take-table tbody tr:hover td {
+    background: rgba(196,30,36,0.04);
+}
+
+#tab-offtake .off-take-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* Outlet name column (2nd col) – emphasis */
+#tab-offtake .off-take-table td:nth-child(2) strong {
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+/* Numeric columns right-align */
+#tab-offtake .off-take-table .cf-td-number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+}
+
+/* Table footer */
+#tab-offtake .table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-light);
+    background: var(--card-bg);
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+}
+
+#tab-offtake #off-take-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#tab-offtake #off-take-pagination .btn-secondary {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* ── Actions column ──────────────────────────────────────── */
+#tab-offtake .col-actions {
+    text-align: center;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+#tab-offtake .col-actions .btn-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    background: var(--card-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+    transition: all 0.15s;
+    margin: 0 2px;
+}
+
+#tab-offtake .col-actions .btn-icon:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(196,30,36,0.06);
+}
+
+#tab-offtake .col-actions .btn-delete:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(255,82,82,0.06);
+}
+
+/* ── Empty table state ───────────────────────────────────── */
+#tab-offtake .table-empty-cell {
+    padding: 48px 20px !important;
+    text-align: center !important;
+    color: var(--text-muted) !important;
+    font-size: 14px;
+}
+
+/* ── Dark mode table ─────────────────────────────────────── */
+body.dark-mode #tab-offtake .off-take-table th {
+    background: #111827;
+}
+
+body.dark-mode #tab-offtake .off-take-table tbody tr:hover td {
+    background: rgba(229,48,48,0.05);
+}
+
+/* =============================================================
+   OFF TAKE MODAL FORM — Add/Edit
+   ============================================================= */
+
+.off-take-modal.modal {
+    width: min(980px, calc(100vw - 24px));
+    max-height: 92dvh;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+}
+
+.off-take-modal .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+    background: var(--card-bg);
+}
+
+.off-take-modal .modal-header h2 {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.off-take-modal .outlet-master-modal-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    line-height: 1.5;
+}
+
+.off-take-modal .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--card-bg);
+}
+
+.off-take-modal .modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+    background: var(--card-bg);
+}
+
+.off-take-modal .modal-footer .btn-secondary {
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 10px;
+}
+
+.off-take-modal .modal-footer .btn-primary {
+    min-height: 44px;
+    padding: 0 28px;
+    border-radius: 10px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: var(--shadow-red);
+}
+
+/* Flat sections within modal — clean desktop-form look with dividers */
+.off-take-modal .vof-section,
+.off-take-modal .outlet-master-card {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 0;
+    margin: 0;
+    padding: 20px 24px;
+    box-shadow: none;
+}
+
+.off-take-modal .vof-section:last-child,
+.off-take-modal .outlet-master-card:last-child {
+    border-bottom: 0;
+}
+
+.off-take-modal .outlet-master-card__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.off-take-modal .outlet-master-card__num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(196,30,36,0.3);
+}
+
+.off-take-modal .outlet-master-card__title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* Outlet info grid: 2-col on pc, 1-col mobile */
+.off-take-modal .vof-outlet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 12px;
+}
+
+.off-take-modal .vof-outlet-grid .form-group--wide {
+    grid-column: 1 / -1;
+}
+
+/* Readonly outlet info fields */
+.off-take-modal .off-take-readonly {
+    background: color-mix(in srgb, var(--bg-color) 70%, var(--border-light)) !important;
+    color: var(--text-muted) !important;
+    cursor: default;
+    border-style: dashed !important;
+    font-size: 13px;
+}
+
+/* Wholesaler select (TomSelect) */
+.off-take-modal .vof-period-section .form-grid {
+    grid-template-columns: minmax(180px,1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+/* Section label */
+.off-take-modal .vof-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* TomSelect (Outlet + Wholesaler): one clean border, matches the other inputs.
+   Kills the doubled frame (borderless wrapper, single bordered control). */
+.off-take-modal .ts-wrapper,
+.off-take-modal .ts-wrapper.focus,
+.off-take-modal .ts-wrapper.multi {
+    border: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.off-take-modal .ts-wrapper .ts-control {
+    border: 1.5px solid var(--border-light) !important;
+    border-radius: 8px !important;
+    background: var(--bg-color) !important;
+    min-height: 46px;
+    padding: 6px 12px !important;
+    box-shadow: none !important;
+}
+
+.off-take-modal .ts-wrapper.focus .ts-control {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px var(--focus-ring) !important;
+}
+
+/* ── Wholesaler cards inside modal ───────────────────────── */
+.vof-wholesaler-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.vof-wholesaler-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: none;
+    transition: border-color 0.15s;
+}
+
+.vof-wholesaler-card:focus-within {
+    border-color: rgba(196,30,36,0.3);
+}
+
+.vof-wholesaler-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: color-mix(in srgb, var(--card-bg) 80%, var(--bg-color));
+    border-bottom: 1px solid var(--border-light);
+}
+
+.vof-wholesaler-head > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.vof-wholesaler-head span:first-child {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.vof-wholesaler-head strong {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.vof-product-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 3px 10px;
+    white-space: nowrap;
+}
+
+/* Product adder row */
+.vof-product-adder {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--card-bg);
+    flex-wrap: wrap;
+}
+
+.vof-product-adder .vof-product-select {
+    flex: 1;
+    min-width: 200px;
+    height: 40px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.vof-product-adder .btn-secondary {
+    height: 40px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border-color: var(--primary);
+    color: var(--primary);
+    transition: background 0.15s, color 0.15s;
+}
+
+.vof-product-adder .btn-secondary:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+/* Off-take line list */
+.off-take-line-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+}
+
+.off-take-line-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 24px;
+    background: var(--bg-color);
+    border-radius: 8px;
+    border: 1.5px dashed var(--border-light);
+}
+
+/* Product line card */
+.off-take-line-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color 0.15s;
+}
+
+.off-take-line-card:hover {
+    border-color: rgba(196,30,36,0.25);
+}
+
+.off-take-line-product {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.off-take-line-product > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.off-take-line-product strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.off-take-line-product span {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+/* Remove button */
+.vof-remove-line {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.vof-remove-line:hover {
+    background: #fee2e2;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* Price/Vol/Rebate input grid */
+.off-take-line-entry {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.off-take-line-entry label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.off-take-line-entry .form-input {
+    height: 42px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+    padding: 0 12px;
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-color);
+    color: var(--text-main);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+}
+
+.off-take-line-entry .form-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    outline: none;
+    background: var(--card-bg);
+}
+
+/* Line totals bar */
+.vof-line-totals {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.vof-line-totals span {
+    flex: 1;
+    min-width: 120px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vof-line-totals strong {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-main);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Mobile: off-take line entry stacks 2-col */
+@media (max-width: 600px) {
+    .off-take-line-entry {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+
+    .off-take-modal .modal-body {
+        padding: 14px 16px;
+    }
+
+    .off-take-modal .modal-header {
+        padding: 16px 16px 12px;
+    }
+
+    .off-take-modal .vof-outlet-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .vof-product-adder {
+        flex-direction: column;
+    }
+
+    .vof-product-adder .vof-product-select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .vof-product-adder .btn-secondary {
+        width: 100%;
+        height: 44px;
+    }
+
+    .vof-line-totals span {
+        min-width: calc(50% - 4px);
+    }
+
+    .off-take-modal.modal {
+        border-radius: 16px 16px 0 0;
+        align-self: flex-end;
+        max-height: 96dvh;
+    }
+}
+
+/* =============================================================
+   GLOBAL MODAL SHELL IMPROVEMENTS
+   (affects all modals: outlet master, save confirm, detail, etc.)
+   ============================================================= */
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,15,0.55);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-overlay.active {
+    display: flex;
+    animation: overlayFadeIn 0.2s ease;
+}
+
+@keyframes overlayFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.modal {
+    background: var(--card-bg);
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-light);
+    animation: modalSlideIn 0.25s var(--ease-spring);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 92dvh;
+    width: min(600px, calc(100vw - 24px));
+}
+
+.modal-wide {
+    width: min(900px, calc(100vw - 24px));
+}
+
+@keyframes modalSlideIn {
+    from { transform: translateY(16px) scale(0.97); opacity: 0; }
+    to   { transform: translateY(0) scale(1);       opacity: 1; }
+}
+
+.modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.3px;
+}
+
+.modal-header .btn-close {
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: all 0.15s;
+}
+
+.modal-header .btn-close:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    transform: rotate(90deg);
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 24px;
+}
+
+.modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* Outlet master form within modal */
+.outlet-master-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Outlet master card section */
+.outlet-master-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 16px 18px;
+}
+
+.outlet-master-card__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 12px;
+}
+
+/* form labels in modals */
+.form-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.form-label .req {
+    color: var(--danger);
+    margin-left: 2px;
+}
+
+/* form inputs in modals */
+.form-input,
+.form-select {
+    width: 100%;
+    height: 42px;
+    padding: 0 13px;
+    border: 1.5px solid var(--border-light);
+    border-radius: 8px;
+    background: var(--bg-color);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    outline: none;
+}
+
+.form-input:focus,
+.form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    background: var(--card-bg);
+}
+
+/* =============================================================
+   SAVE CONFIRM & DETAIL OVERLAY UPGRADES
+   ============================================================= */
+
+.confirm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,15,0.55);
+    z-index: 20000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.confirm-overlay.show {
+    display: flex;
+    animation: overlayFadeIn 0.2s ease;
+}
+
+.confirm-box {
+    background: var(--card-bg);
+    border-radius: 18px;
+    padding: 28px 28px 24px;
+    max-width: 460px;
+    width: 100%;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.25);
+    border: 1px solid var(--border-light);
+    animation: modalSlideIn 0.25s var(--ease-spring);
+    position: relative;
+}
+
+.confirm-box h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 12px;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.confirm-actions .btn-secondary,
+.confirm-actions .btn-primary,
+.confirm-actions .btn-danger {
+    min-height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Detail overlay */
+.detail-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,15,0.55);
+    z-index: 20000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.detail-overlay.show {
+    display: flex;
+    animation: overlayFadeIn 0.2s ease;
+}
+
+.detail-box {
+    background: var(--card-bg);
+    border-radius: 18px;
+    max-width: 560px;
+    width: 100%;
+    max-height: 86dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 28px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.25);
+    border: 1px solid var(--border-light);
+    animation: modalSlideIn 0.25s var(--ease-spring);
+    position: relative;
+}
+
+.detail-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.detail-close:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    transform: rotate(90deg);
+}
+
+/* =============================================================
+   FORM INPUT SIZING – MOBILE FRIENDLY (global touch targets)
+   ============================================================= */
+
+@media (max-width: 640px) {
+    .form-input,
+    .form-select,
+    input[type=text],
+    input[type=email],
+    input[type=number],
+    input[type=month],
+    input[type=search],
+    select,
+    textarea {
+        font-size: 16px !important; /* prevent iOS zoom */
+        min-height: 46px;
+    }
+
+    .off-take-modal .modal-footer {
+        flex-direction: column-reverse;
+        gap: 8px;
+        padding: 14px 16px;
+    }
+
+    .off-take-modal .modal-footer .btn-primary,
+    .off-take-modal .modal-footer .btn-secondary {
+        width: 100%;
+        height: 48px;
+        font-size: 15px;
+    }
+
+    .confirm-actions {
+        flex-direction: column-reverse;
+    }
+
+    .confirm-actions .btn-secondary,
+    .confirm-actions .btn-primary,
+    .confirm-actions .btn-danger {
+        width: 100%;
+        height: 48px;
+    }
+
+    #tab-offtake .page-title {
+        font-size: 22px;
+    }
+}
+
+/* =============================================================
+   NEW VISIT FORM – IMPROVED LAYOUT
+   (only fields / layout — not touching visit all)
+   ============================================================= */
+
+#tab-new .card {
+    border-radius: 16px;
+}
+
+#tab-new .form-grid {
+    gap: 14px;
+}
+
+#tab-new input[type=text],
+#tab-new input[type=date],
+#tab-new select,
+#tab-new textarea {
+    border-radius: 10px;
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-color);
+    font-size: 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#tab-new input[type=text]:focus,
+#tab-new select:focus,
+#tab-new textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    background: var(--card-bg);
+}
+
+#tab-new .form-actions {
+    gap: 10px;
+}
+
+#tab-new .form-actions .btn-primary,
+#tab-new .form-actions .btn-secondary {
+    min-height: 48px;
+    padding: 0 24px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+#tab-new label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+/* ── Next visit date wrap ────────────────────────────────── */
+#tab-new #next-visit-wrap {
+    border-radius: 10px;
+    border: 1.5px solid rgba(196,30,36,0.25);
+    background: rgba(196,30,36,0.04);
+    padding: 14px;
+}
+
+/* ── Camera section ──────────────────────────────────────── */
+#tab-new .easy-camera-container {
+    border-radius: 12px;
+    padding: 20px 18px;
+}
+
+/* =============================================================
+   DARK MODE ADDITIONS
+   ============================================================= */
+
+body.dark-mode .off-take-line-card {
+    background: #1e1e1e;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .vof-wholesaler-card {
+    background: #111;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .vof-wholesaler-head {
+    background: #181818;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .vof-product-adder {
+    background: #181818;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .off-take-line-empty {
+    background: #181818;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .vof-line-totals span {
+    background: #181818;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .modal,
+body.dark-mode .confirm-box,
+body.dark-mode .detail-box {
+    background: #1a1a1a;
+    border-color: #2a2a2a;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+}
+
+body.dark-mode .modal-header,
+body.dark-mode .modal-footer {
+    background: #1a1a1a;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .off-take-modal .modal-body {
+    background: var(--card-bg);
+}
+
+body.dark-mode .off-take-modal .vof-section,
+body.dark-mode .off-take-modal .outlet-master-card {
+    background: transparent;
+    border-color: #2a2a2a;
+}
+
+body.dark-mode .form-input,
+body.dark-mode .form-select {
+    background: #111;
+    border-color: #2a2a2a;
+    color: #f0f0f0;
+}
+
+body.dark-mode .off-take-readonly {
+    background: #0e1520 !important;
+    border-color: #2a2a2a !important;
+}
+
+/* ============================================================
+   RESPONSIVE: TABLET breakpoint for offtake page
+   ============================================================ */
+
+@media (max-width: 900px) {
+    #tab-offtake .off-take-table-wrap {
+        max-height: 58vh;
+    }
+
+    #tab-offtake .off-take-advanced-filters {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+
+    .off-take-modal .vof-outlet-grid,
+    .outlet-master-card__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .off-take-modal.modal {
+        width: calc(100vw - 16px);
+    }
+}
+
+@media (max-width: 480px) {
+    #tab-offtake .status-pills {
+        flex-direction: column;
+        border-radius: 12px;
+    }
+
+    #tab-offtake .status-pill {
+        border-right: 0;
+        border-bottom: 1px solid var(--border-light);
+        padding: 12px 16px;
+    }
+
+    #tab-offtake .status-pill:last-child {
+        border-bottom: 0;
+    }
+
+    #tab-offtake .off-take-table-wrap {
+        max-height: 50vh;
+    }
+
+    #tab-offtake .table-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    #tab-offtake #off-take-pagination {
+        width: 100%;
+        justify-content: center;
     }
 }
