@@ -9,7 +9,7 @@
         <link rel="manifest" href="manifest.json">
         <meta name="theme-color" content="#C41E24">
         <link rel="apple-touch-icon" href="icon.png">
-        <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="style.css?v=20260619-8">
         <style>
         /* Tom Select — match app theme */
         .ts-wrapper { width: 100%; }
@@ -1233,16 +1233,93 @@
 
                         <!-- Exact OneAlchemy Off Take data table -->
                         <div id="tab-offtake" style="display:none">
-                            <div class="page-heading"><div><h1
-                                        class="page-title">Off Take</h1><p
-                                        class="page-subtitle">Browse off-take
-                                        records from Supabase</p></div></div>
-                            <div class="data-page-summary"><div
-                                    class="status-pills"><div
-                                        class="status-pill status-pill--total"><span
-                                            class="status-pill__label">Total</span><span
-                                            id="off-take-total-count"
-                                            class="status-pill__count">0</span></div></div></div>
+                            <div class="page-heading">
+                                <div>
+                                    <h1 class="page-title">Off Take</h1>
+                                    <p class="page-subtitle">Browse and manage
+                                        off-take records</p>
+                                </div>
+                                <div
+                                    style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                    <button class="btn-secondary" type="button"
+                                        style="min-height:42px;border-radius:10px;font-size:13px;"
+                                        onclick="loadVisitationOffTakeExact(true)">
+                                        <svg width="15" height="15"
+                                            viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"><polyline
+                                                points="23 4 23 10 17 10" /><polyline
+                                                points="1 20 1 14 7 14" /><path
+                                                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+                                        Refresh
+                                    </button>
+                                    <button
+                                        class="btn-secondary admin-only-control"
+                                        type="button"
+                                        style="min-height:42px;border-radius:10px;font-size:13px;"
+                                        onclick="exportVisitationOffTakeToExcel()">
+                                        <svg width="15" height="15"
+                                            viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"><path
+                                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline
+                                                points="7 10 12 15 17 10" /><line
+                                                x1="12" y1="15" x2="12"
+                                                y2="3" /></svg>
+                                        Export
+                                    </button>
+                                    <label
+                                        class="btn-secondary admin-only-control"
+                                        style="min-height:42px;border-radius:10px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:0 16px;">
+                                        <svg width="15" height="15"
+                                            viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"><path
+                                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline
+                                                points="17 8 12 3 7 8" /><line
+                                                x1="12" y1="3" x2="12"
+                                                y2="15" /></svg>
+                                        Import
+                                        <input type="file" accept=".xlsx,.xls"
+                                            style="display:none"
+                                            onchange="handleVisitationOffTakeImportFile(event)">
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="data-page-summary">
+                                <div class="status-pills">
+                                    <div class="status-pill status-pill--total">
+                                        <span class="status-pill__label">Total
+                                            Records</span>
+                                        <span id="off-take-total-count"
+                                            class="status-pill__count">0</span>
+                                    </div>
+                                    <div class="status-pill"
+                                        id="off-take-vol-pill"
+                                        style="display:none">
+                                        <span class="status-pill__label">Total
+                                            Vol. (Btls.)</span>
+                                        <span id="off-take-vol-count"
+                                            class="status-pill__count"
+                                            style="font-size:20px;">0</span>
+                                    </div>
+                                    <div class="status-pill"
+                                        id="off-take-rebate-pill"
+                                        style="display:none">
+                                        <span class="status-pill__label">Total
+                                            Rebate</span>
+                                        <span id="off-take-rebate-count"
+                                            class="status-pill__count"
+                                            style="font-size:18px;">0.00</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="toolbar off-take-toolbar">
                                 <div class="search-wrap"><i class="icon"
                                         aria-hidden="true"><svg width="17"
@@ -1256,32 +1333,63 @@
                                         class="search-input"
                                         placeholder="Search outlet, wholesaler, SKU, brand, product..."
                                         oninput="renderVisitationOffTakeExact()"></div>
-                                <select id="off-take-year-filter"
-                                    class="filter-select off-take-filter-select"
-                                    onchange="renderVisitationOffTakeExact()"><option
-                                        value>All Years</option></select><select
-                                    id="off-take-month-filter"
-                                    class="filter-select off-take-filter-select"
-                                    onchange="renderVisitationOffTakeExact()"><option
-                                        value>All
-                                        Months</option></select><select
-                                    id="off-take-wholesaler-filter"
-                                    class="filter-select off-take-filter-select off-take-filter-select--wide"
-                                    onchange="renderVisitationOffTakeExact()"><option
-                                        value>All
-                                        Wholesalers</option></select><select
-                                    id="off-take-principle-filter"
-                                    class="filter-select off-take-filter-select"
-                                    onchange="renderVisitationOffTakeExact()"><option
-                                        value>All
-                                        Principles</option></select><select
-                                    id="off-take-category-filter"
-                                    class="filter-select off-take-filter-select"
-                                    onchange="renderVisitationOffTakeExact()"><option
-                                        value>All Categories</option></select>
+                                <button id="off-take-filter-toggle"
+                                    class="btn-secondary off-take-filter-toggle"
+                                    type="button" aria-expanded="false"
+                                    onclick="toggleVisitationOffTakeFilters()">
+                                    <svg width="15" height="15"
+                                        viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"><polygon
+                                            points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+                                    Filters <span id="off-take-filter-badge"
+                                        hidden>0</span>
+                                </button>
                                 <button class="btn-primary admin-only-control"
                                     type="button"
-                                    onclick="openVisitationOffTakeForm()">＋ Add
+                                    onclick="openVisitationOffTakeForm()">
+                                    <svg width="15" height="15"
+                                        viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2.5"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"><line x1="12"
+                                            y1="5" x2="12" y2="19" /><line
+                                            x1="5" y1="12" x2="19"
+                                            y2="12" /></svg>
+                                    Add Off Take
+                                </button>
+                                <div id="off-take-advanced-filters"
+                                    class="off-take-advanced-filters"><select
+                                        id="off-take-year-filter"
+                                        class="filter-select off-take-filter-select"
+                                        onchange="renderVisitationOffTakeExact()"><option
+                                            value>All
+                                            Years</option></select><select
+                                        id="off-take-month-filter"
+                                        class="filter-select off-take-filter-select"
+                                        onchange="renderVisitationOffTakeExact()"><option
+                                            value>All
+                                            Months</option></select><select
+                                        id="off-take-wholesaler-filter"
+                                        class="filter-select off-take-filter-select off-take-filter-select--wide"
+                                        onchange="renderVisitationOffTakeExact()"><option
+                                            value>All
+                                            Wholesalers</option></select><select
+                                        id="off-take-principle-filter"
+                                        class="filter-select off-take-filter-select"
+                                        onchange="renderVisitationOffTakeExact()"><option
+                                            value>All
+                                            Principles</option></select><select
+                                        id="off-take-category-filter"
+                                        class="filter-select off-take-filter-select"
+                                        onchange="renderVisitationOffTakeExact()"><option
+                                            value>All
+                                            Categories</option></select></div>
+                                <button class="btn-primary admin-only-control"
+                                    type="button"
+                                    onclick="openVisitationOffTakeForm()"
+                                    style="display:none">＋ Add
                                     New Off Take</button>
                             </div>
                             <div class="quick-filter-banner"
@@ -3030,7 +3138,7 @@
                 src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
             <script
                 src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-            <script src="app.js"></script>
+            <script src="app.js?v=20260619-8"></script>
 
             <template id="visit-card-template">
                 <div class="visit-card" style="padding: 1.25rem;">
@@ -3057,4 +3165,4 @@
                 </div>
             </template>
         </body>
-    </html>
+    </html>     
